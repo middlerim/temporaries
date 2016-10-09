@@ -1,0 +1,13 @@
+<resources>
+
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <item name="android:actionMenuTextColor">@color/white</item>
+        <item name="preferenceTheme">@style/PreferencesTheme</item>
+    </style>
+
+
+    <style name="PreferencesTheme" parent="@style/PreferenceThemeOverlay">
+        <item name="android:background">@color/optional</item>
+    </style>
+
+</resources>

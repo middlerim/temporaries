@@ -1,0 +1,9 @@
+allprojects {
+  group = 'com.middlerim'
+  version = '0.2'
+
+  repositories {
+    jcenter()
+  }
+}
+
