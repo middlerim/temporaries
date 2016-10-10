@@ -1,0 +1,95 @@
+doctype html
+html
+  head
+    meta(charset='UTF-8')
+    link(href='app.css', rel='stylesheet')
+    script(src='d3/d3.min.js')
+    script(src='d3/d3-array.min.js')
+    script(src='d3/d3-geo.min.js')
+    script(src='d3/queue.min.js')
+    script(src='d3/topojson.min.js')
+    script.
+      function getRandomColor() {
+          var letters = '0123456789ABCDEF';
+          var color = '#';
+          for (var i = 0; i < 6; i++ ) {
+              color += letters[Math.floor(Math.random() * 16)];
+          }
+          return color;
+      }
+
+      var ws = new WebSocket("ws://localhost:8080/sample");
+      ws.onopen = function(event) {
+        stateChange("opened")
+      };
+      ws.onmessage = function(event) {
+        document.getElementById("log").innerHTML += "<li>" + event.data + "</li>";
+      };
+      ws.onclose = function(event) {
+        stateChange("closed")
+      };
+      ws.onerror = function(event) {
+        stateChange("error: " + event)
+      };
+      function sendMessage() {
+        var request = document.getElementById("message").value;
+        ws.send(request);
+      }
+      function stateChange(state) {
+        document.getElementById("state").innerHTML = state;
+      }
+  body
+    h1
+    input#message(type='text')
+    input(type='button', value='send', onclick='sendMessage()')
+    span#state closed
+    ul#log
+
+    script.
+      var width = 1280,
+          height = 640;
+
+      var projection = d3.geoEquirectangular()
+          .translate([width / 2, height / 2])
+          .scale(205);
+
+      var canvas = d3.select("body").append("canvas")
+          .attr("width", width)
+          .attr("height", height);
+
+      var c = canvas.node().getContext("2d");
+      var path = d3.geoPath()
+          .projection(projection)
+          .context(c);
+      var circle = d3.geoCircle();
+      var title = d3.select("h1");
+
+      queue()
+          .defer(d3.json, "world.json")
+          .defer(d3.json, "location/test.json")
+          .await(ready);
+
+      function ready(error, world, vpTree) {
+        if (error) throw error;
+
+        var globe = {type: "Sphere"},
+            land = topojson.feature(world, world.objects.land),
+            borders = topojson.mesh(world, world.objects.countries, function(a, b) { return a !== b; });
+
+        projection.rotate([-139,0,0]);
+
+        c.fillStyle = "#ccc", c.beginPath(), path(land), c.fill();
+        c.strokeStyle = "#fff", c.lineWidth = .5, c.beginPath(), path(borders), c.stroke();
+        c.strokeStyle = "#000", c.lineWidth = 2, c.beginPath(), path(globe), c.stroke();
+
+        for(node of vpTree) {
+          c.beginPath();
+          path(circle.center(node.vp).radius(node.r)());
+          c.fillStyle = getRandomColor();
+          c.fill();
+          //c.lineWidth = '50';
+          //c.strokeStyle = getRandomColor();
+          c.globalAlpha = 0.4
+          //c.stroke();
+        }
+      }

@@ -11,7 +11,7 @@ public class SphericalPoint implements TreePoint<SphericalPoint> {
     this.session = session;
     this.point = point;
   }
-  public SphericalPoint(Session session, double latitude, double longtitude) {
+  public SphericalPoint(Session session, int latitude, int longtitude) {
     this(session, new Point(latitude, longtitude));
   }
 

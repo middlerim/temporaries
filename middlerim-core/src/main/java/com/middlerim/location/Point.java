@@ -1,31 +1,35 @@
 package com.middlerim.location;
 
 public class Point implements Comparable<Point> {
-  private static final double PI180 = Math.PI / 180;
-  private static final double ACCEPTABLE_RANGE = 0.00001;
-  private static final double ACCEPTABLE_RANGE_N = -0.00001;
+  public static final double GETA = 100000;
+  private static final double PI180 = Math.PI / 180 / GETA;
 
-  public final double latitude;
-  public final double longitude;
+  public final int latitude;
+  public final int longitude;
 
-  public Point(double latitude, double longtitude) {
+  public static Point forTest(double latitude, double longtitude) {
+    return new Point((int) (latitude * GETA), (int) (longtitude * GETA));
+  }
+
+  public Point(int latitude, int longtitude) {
     this.latitude = latitude;
     this.longitude = longtitude;
   }
 
-  private double radians(double deg) {
+  public static double radians(int deg) {
     return deg * PI180;
   }
   public int distanceSimple(Point b) {
-    return (int) ((Math.abs(latitude - b.latitude) + Math.abs(longitude - b.longitude)) * 10000);
+    return Math.abs(latitude - b.latitude) + Math.abs(longitude - b.longitude);
   }
 
   public int distanceMeter(Point b) {
     double lat1 = radians(latitude);
     double lat2 = radians(b.latitude);
-    int distanceMeter = (int) (6378137d * Math.acos(Math.cos(lat1) *
-        Math.cos(lat2) * Math.cos(radians(b.longitude) - radians(longitude)) +
-        Math.sin(lat1) * Math.sin(lat2)));
+    int distanceMeter = (int) (6378137d
+        * Math.acos(Math.cos(lat1) * Math.cos(lat2)
+            * Math.cos(radians(b.longitude) - radians(longitude))
+            + Math.sin(lat1) * Math.sin(lat2)));
     return distanceMeter;
   }
 
@@ -39,19 +43,11 @@ public class Point implements Comparable<Point> {
     return (int) latitude;
   }
 
-  public static int compare(double a, double b) {
-    double d = a - b;
-    if (ACCEPTABLE_RANGE_N <= d && d <= ACCEPTABLE_RANGE) {
-      return 0;
-    }
-    return d < 0 ? -1 : 1;
-  }
-
   @Override
   public int compareTo(Point o) {
-    int l = compare(o.latitude, latitude);
+    int l = latitude - o.latitude;
     if (l == 0) {
-      return longitude < o.longitude ? -1 : 1;
+      return o.longitude - o.longitude;
     }
     return l;
   }
@@ -62,7 +58,7 @@ public class Point implements Comparable<Point> {
       return false;
     }
     Point b = (Point) obj;
-    return compare(b.latitude, latitude) == 0
-        && compare(b.longitude, longitude) == 0;
+    return b.latitude == latitude
+        && b.longitude == longitude;
   }
 }

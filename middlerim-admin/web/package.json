@@ -1,0 +1,48 @@
+{
+  "name": "middlerim-admin",
+  "version": "0.0.2",
+  "private": true,
+  "scripts": {
+    "start": "node www",
+    "gulp": "gulp",
+    "gulp-release": "gulp-release",
+    "gulp-watch": "gulp watch",
+    "gulp-tsc": "gulp tsc",
+    "gulp-tsc-spec": "gulp tsc-spec",
+    "gulp-pages": "gulp pages"
+  },
+  "dependencies": {
+    "body-parser": "~1.15.1",
+    "cookie-parser": "~1.4.3",
+    "debug": "~2.2.0",
+    "express": "~4.13.4",
+    "jade": "~1.11.0",
+    "morgan": "~1.7.0",
+    "serve-favicon": "~2.3.0",
+    "d3-geo": "~1.2.5",
+    "topojson": "*"
+  },
+  "devDependencies": {
+    "del": "^2.2.2",
+    "event-stream": "^3.3.4",
+    "gulp": "^3.9.1",
+    "gulp-bower": "0.0.13",
+    "gulp-concat": "^2.6.0",
+    "gulp-filter": "^4.0.0",
+    "gulp-jade": "^1.1.0",
+    "gulp-rename": "^1.2.2",
+    "gulp-replace": "^0.5.4",
+    "gulp-sass": "^2.3.2",
+    "gulp-shell": "^0.5.2",
+    "gulp-sourcemaps": "^1.6.0",
+    "gulp-typescript": "^2.13.6",
+    "gulp-typings": "^2.0.3",
+    "gulp-zip": "^3.2.0",
+    "main-bower-files": "^2.13.1",
+    "run-sequence": "^1.2.1",
+    "typings": "^1.3.2"
+  },
+  "description": "middlerim-admin console",
+  "main": "app.js",
+  "author": "sndyuk"
+}

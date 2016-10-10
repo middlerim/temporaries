@@ -1,1 +1,1 @@
-include 'middlerim-core', 'middlerim-server', 'middlerim-client'
+include 'middlerim-core', 'middlerim-server', 'middlerim-client', 'middlerim-admin'

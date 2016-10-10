@@ -27,8 +27,8 @@ public final class Location implements Outbound, ControlMessage {
     session.sessionId.readBytes(sessionIdBytes);
     buf.writeByte(Headers.LOCATION)
         .writeBytes(sessionIdBytes)
-        .writeDouble(point.latitude)
-        .writeDouble(point.longitude);
+        .writeInt(point.latitude)
+        .writeInt(point.longitude);
     return ctx.write(new DatagramPacket(buf, CentralServer.serverAddress));
   }
   @Override

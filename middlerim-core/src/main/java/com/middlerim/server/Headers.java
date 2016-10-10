@@ -23,6 +23,11 @@ public final class Headers {
   public static final byte AGAIN = 0b0000011;
 
   /**
+   * Assign Anonymous-ID.
+   */
+  public static final byte ASSIGN_AID = 0b0000100;
+
+  /**
    * Location mask.
    */
   public static final byte LOCATION = 0b0001000;

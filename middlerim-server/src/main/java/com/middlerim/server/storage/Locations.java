@@ -2,21 +2,29 @@ package com.middlerim.server.storage;
 
 import java.util.List;
 
-import com.middlerim.location.Point;
+import com.middlerim.server.Config;
+import com.middlerim.server.message.Location;
 import com.middlerim.server.storage.location.LocationStorage;
 import com.middlerim.server.storage.location.LocationStorage.Entry;
 import com.middlerim.server.storage.location.SphericalPoint;
 import com.middlerim.server.storage.location.VpTree;
+import com.middlerim.server.storage.persistent.FixedLayoutPersistentStorage;
+import com.middlerim.server.storage.persistent.StorageInformation;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.session.SessionListener;
 
 public final class Locations {
 
-  private static LocationStorage<SphericalPoint> map = new VpTree<>();
+  private static final LocationStorage<SphericalPoint> map = new VpTree<>();
+  private static final FixedLayoutPersistentStorage<Location> persistentStorage = new FixedLayoutPersistentStorage<>(
+      new StorageInformation<>("locations",
+          Location.SERIALIZED_BYTE_SIZE,
+          Location.SERIALIZED_BYTE_SIZE * (Config.TEST ? 100 : SessionId.MAX_USER_SIZE)));
 
-  public static void updateLocation(Session session, Point point) {
-    map.put(new SphericalPoint(session, point));
+  public static void updateLocation(Session session, Location location) {
+    map.put(new SphericalPoint(session, location.point));
+    persistentStorage.put(location);
   }
 
   public static Entry findBySessionId(SessionId sessionId) {
@@ -41,6 +49,7 @@ public final class Locations {
       @Override
       public void onRemove(Session session) {
         map.remove(session.sessionId);
+        persistentStorage.delete(session.sessionId.userId());
       }
     });
   }

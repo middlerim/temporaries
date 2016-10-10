@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.middlerim.client.CentralEvents;
+import com.middlerim.client.CentralServer;
 import com.middlerim.client.Config;
 import com.middlerim.client.message.Markers;
 import com.middlerim.client.message.OutboundMessage;
@@ -21,6 +22,8 @@ import com.middlerim.client.view.ViewContext;
 import com.middlerim.message.Outbound;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
+import com.middlerim.session.SessionId;
+import com.middlerim.token.TokenIssuer;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -44,6 +47,12 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
     byte header = in.readByte();
+    if (header == Headers.ASSIGN_AID) {
+      byte[] tokenBytes = new byte[8];
+      in.readBytes(tokenBytes);
+      SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
+      Sessions.setSession(Session.create(sessionId, CentralServer.serverAddress));
+    }
     Session session = Sessions.getSession();
     short sequenceNo = in.readShort();
 

@@ -1,15 +1,11 @@
 package com.middlerim.android.ui;
 
 import android.Manifest;
-import android.annotation.TargetApi;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.LocalBroadcastManager;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
@@ -17,7 +13,6 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import com.middlerim.android.ui.dummy.DummyContent;
 import com.middlerim.client.CentralEvents;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.location.Point;
@@ -92,6 +87,9 @@ public class Middlerim extends AppCompatActivity {
         switch (item.getItemId()) {
             case R.id.action_settings:
                 GeneralPreferenceFragment.open(this);
+                return true;
+            case R.id.action_signIn:
+                SignInFragment.open(this);
                 return true;
             case R.id.action_search:
                 System.out.println(item);

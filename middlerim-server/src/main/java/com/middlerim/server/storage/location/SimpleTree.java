@@ -22,7 +22,7 @@ public class SimpleTree implements LocationStorage<SimpleTree.Entry> {
       this.session = session;
       this.point = point;
     }
-    public Entry(Session session, double latitude, double longtitude) {
+    public Entry(Session session, int latitude, int longtitude) {
       this(session, new Point(latitude, longtitude));
     }
 
@@ -36,7 +36,7 @@ public class SimpleTree implements LocationStorage<SimpleTree.Entry> {
     }
     @Override
     public int compareTo(Entry o) {
-      int d = Point.compare(point.latitude, o.point.latitude);
+      int d = point.latitude - o.point.latitude;
       return d == 0 ? compareUserId(o) : d;
     }
     private int compareUserId(Entry o) {
@@ -59,11 +59,11 @@ public class SimpleTree implements LocationStorage<SimpleTree.Entry> {
   }
 
   private static final Session DUMMY_SESSION = Session.create(new SessionId(new byte[]{0, 0, 0, 0, 0, 0, 0, 0}), null);
-  private static final Long DUMMY_VALUE = 0L;
-  private static final double MAX_METER_PAR_LATITUDE = (2 * Math.PI * 6378137d) / 360;
+  private static final Integer DUMMY_VALUE = 0;
+  private static final int MAX_METER_PAR_LATITUDE = (int)(((2 * Math.PI * 6378137d) / 360) * Point.GETA);
 
   private Map<SessionId, Entry> userLocationMap = new HashMap<>();
-  private TreeMap<Entry, Long> locs = new TreeMap<>();
+  private TreeMap<Entry, Integer> locs = new TreeMap<>();
 
   @Override
   public void put(Entry entry) {
@@ -102,10 +102,10 @@ public class SimpleTree implements LocationStorage<SimpleTree.Entry> {
     }
 
     int meter = MessageCommands.toMeter(radius);
-    double deltaLatitude = meter / MAX_METER_PAR_LATITUDE;
+    int deltaLatitude = meter / MAX_METER_PAR_LATITUDE;
     Entry minLatitude = new Entry(DUMMY_SESSION, new Point(user.point.latitude - deltaLatitude, user.point.longitude));
     Entry maxLatitude = new Entry(DUMMY_SESSION, new Point(user.point.latitude + deltaLatitude, user.point.longitude));
-    SortedMap<Entry, Long> subMap = locs.subMap(minLatitude, false, maxLatitude, false);
+    SortedMap<Entry, Integer> subMap = locs.subMap(minLatitude, false, maxLatitude, false);
     for (Entry entry : subMap.keySet()) {
       if (user.session.sessionId.equals(entry.session.sessionId)) {
         continue;

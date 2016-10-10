@@ -77,7 +77,9 @@ public class LocationTracker {
                     Log.d(TAG, "gps provider does not exist " + ex.getMessage());
                 }
 
-                checkPermission();
+                if (!checkPermission()) {
+                    return;
+                }
                 Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                 if (lastKnownLocation == null) {
                     lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
@@ -88,8 +90,10 @@ public class LocationTracker {
     }
 
     public void stop() {
+        if (!checkPermission()) {
+            return;
+        }
         if (locationManager != null) {
-            checkPermission();
             locationManager.removeUpdates(locationListener);
         }
     }

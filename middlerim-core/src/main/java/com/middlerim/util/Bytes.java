@@ -6,6 +6,10 @@ public final class Bytes {
   private Bytes() {
   }
 
+  public static long bytesToInt(byte[] bytes) {
+    return ByteBuffer.wrap(bytes).getInt();
+  }
+
   public static byte[] longToBytes(long value) {
     byte[] bytes = new byte[8];
     ByteBuffer.wrap(bytes).putLong(value);

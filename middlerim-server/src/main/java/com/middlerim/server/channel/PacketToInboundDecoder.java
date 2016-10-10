@@ -32,7 +32,7 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.MessageToMessageDecoder;
 
 public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPacket> {
-  private static final Logger logger = LoggerFactory.getLogger(PacketToInboundDecoder.class);
+  private static final Logger LOG = LoggerFactory.getLogger(PacketToInboundDecoder.class);
   private static Map<Session, ByteBuffer> fragmentedBufferMap = new ConcurrentHashMap<>();
 
   @Override
@@ -41,16 +41,29 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (!in.isReadable()) {
       return;
     }
-    if (logger.isDebugEnabled()) {
-      logger.debug("Received packet: " + msg);
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Received packet: " + msg);
     }
     byte header = in.readByte();
+    if (header == Headers.ASSIGN_AID) {
+      if (in.readableBytes() > 0) {
+        // Invalid access.
+        return;
+      }
+      Session anonymous = Sessions.getOrCreateSession(SessionId.ANONYMOUS, msg.sender());
+      ctx.channel().write(new OutboundMessage<>(anonymous, Markers.ASSIGN_AID));
+    }
+
     byte[] tokenBytes = new byte[8];
     in.readBytes(tokenBytes);
     // TODO Validate the token and convert to session ID
     SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
 
     if (header == Headers.EXIT) {
+      if (in.readableBytes() > 0) {
+        // Invalid access.
+        return;
+      }
       Session session = Sessions.getSession(sessionId);
       if (session != null) {
         Sessions.remove(session);
@@ -58,6 +71,10 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
     if (header == Headers.AGAIN) {
+      if (in.readableBytes() > 0) {
+        // Invalid access.
+        return;
+      }
       Session session = Sessions.getSession(sessionId);
       if (session == null) {
         // Ignore the request.
@@ -81,8 +98,12 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     ctx.channel().attr(AttributeKeys.SESSION).set(session);
 
     if (Headers.isMasked(header, Headers.LOCATION)) {
-      double latitude = in.readDouble();
-      double longtitude = in.readDouble();
+      int latitude = in.readInt();
+      int longtitude = in.readInt();
+      if (in.readableBytes() > 0) {
+        // Invalid access.
+        return;
+      }
       Point point = new Point(latitude, longtitude);
       out.add(new Location(point));
       return;
@@ -137,7 +158,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     ctx.channel().writeAndFlush(new OutboundMessage<>(ctx.channel().attr(AttributeKeys.SESSION).get(), Markers.INVALID_DATA));
     // Ignore BufferUnderFlowException since length of the packet isn't validated deliberately in advance.
     if (!(cause instanceof BufferUnderflowException || (cause.getCause() != null && cause.getCause() instanceof BufferUnderflowException))) {
-      cause.printStackTrace();
+      LOG.error("Unexpected exception", cause);
     }
   }
 

@@ -1,5 +1,6 @@
 package com.middlerim.server.storage;
 
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,13 +9,16 @@ import java.util.List;
 import java.util.Map;
 
 import com.middlerim.server.Config;
+import com.middlerim.server.storage.persistent.IdStorage;
+import com.middlerim.server.storage.persistent.IdStorageInformation;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.session.SessionListener;
 
 public final class Sessions {
-
   private static LinkedList<Session> sessionQueue = new LinkedList<>();
+  private static final IdStorage aidStorage = new IdStorage(new IdStorageInformation("aid", SessionId.ANONYMOUS_USER_FROM, SessionId.ANONYMOUS_USER_TO));
+
   private static Map<SessionId, Session> sessionMap = new HashMap<>();
 
   private static List<SessionListener> listeners = new ArrayList<>();
@@ -24,14 +28,23 @@ public final class Sessions {
       return sessionMap.get(sessionId);
     }
   }
-  public static Session getOrCreateSession(SessionId sessionId, InetSocketAddress address) {
+
+  private static SessionId createAnonymousSessionId() throws IOException {
+    long id = aidStorage.incrementAndGet();
+    return new SessionId(id);
+  }
+
+  public static Session getOrCreateSession(SessionId sessionId, InetSocketAddress address) throws IOException {
+    if (sessionId == SessionId.ANONYMOUS) {
+      sessionId = createAnonymousSessionId();
+    }
     synchronized (sessionMap) {
       Session session = sessionMap.get(sessionId);
       if (session == null) {
         session = Session.create(sessionId, address);
         sessionMap.put(sessionId, session);
         sessionQueue.add(session);
-        if (sessionQueue.size() >= Config.MAX_SESSION_SIZE) {
+        if (sessionQueue.size() >= Config.MAX_ACTIVE_SESSION_SIZE) {
           Session last = sessionQueue.poll();
           remove(last);
         }

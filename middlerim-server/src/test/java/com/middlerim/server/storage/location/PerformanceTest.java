@@ -10,43 +10,42 @@ import org.junit.Test;
 
 import com.middlerim.location.Point;
 import com.middlerim.server.MessageCommands;
-import com.middlerim.server.storage.location.SimpleTree.Entry;
 import com.middlerim.session.Session;
 
 public class PerformanceTest {
 
-  private static final int SIZE = 500_000;
-  private static final byte AREA = MessageCommands.areaKM(16);
+  private static final int SIZE = 5_000_000;
+  private static final byte AREA = MessageCommands.areaKM(32);
 
   @Test
   public void testPerformance() {
     List<Point> points = new ArrayList<Point>(SIZE);
-    points.add(new Point(89.9, 70.9));
+    points.add(Point.forTest(35.4, 139.45));
     for (int i = 1; i < SIZE; ++i) {
-      points.add(new Point(((Math.random() * i) % 180) - 90.1, ((Math.random() * i) % 720) - 360.1));
+      points.add(Point.forTest((Math.random() * i) % 90, (Math.random() * i) % 180));
     }
 
     Session session = SimpleTreeTest.createDummySession(0);
 
     long simpleBuildTime = 0;
     long simpleFindTime = 0;
-    {
-      long start = System.currentTimeMillis();
-      SimpleTree tree = new SimpleTree();
-      tree.put(new Entry(session, points.get(0)));
-      for (int i = 1; i < SIZE; ++i) {
-        tree.put(new Entry(SimpleTreeTest.createDummySession(i), points.get(i)));
-      }
-      assertThat(tree.size(), is(SIZE));
-      simpleBuildTime = (System.currentTimeMillis() - start);
-
-      start = System.nanoTime();
-      List<Entry> found = tree.findAround(session.sessionId, AREA);
-      simpleFindTime = System.nanoTime() - start;
-      System.out.println("Simple Tree Found: " + found.size());
-    }
-    long vpBulkBuildTime;
-    long vpBulkFindTime;
+//    {
+//      long start = System.currentTimeMillis();
+//      SimpleTree tree = new SimpleTree();
+//      tree.put(new Entry(session, points.get(0)));
+//      for (int i = 1; i < SIZE; ++i) {
+//        tree.put(new Entry(SimpleTreeTest.createDummySession(i), points.get(i)));
+//      }
+//      assertThat(tree.size(), is(SIZE));
+//      simpleBuildTime = (System.currentTimeMillis() - start);
+//
+//      start = System.nanoTime();
+//      List<Entry> found = tree.findAround(session.sessionId, AREA);
+//      simpleFindTime = System.nanoTime() - start;
+//      System.out.println("Simple Tree Found: " + found.size());
+//    }
+    long vpBulkBuildTime = 0;
+    long vpBulkFindTime = 0;
     {
       long start = System.currentTimeMillis();
       List<SphericalPoint> vpPoints = new ArrayList<>(SIZE);
@@ -66,8 +65,8 @@ public class PerformanceTest {
         tree.findAround(session.sessionId, AREA);
       }
     }
-    long vpDynamicBuildTime;
-    long vpDynamicFindTime;
+    long vpDynamicBuildTime = 0;
+    long vpDynamicFindTime = 0;
     {
       long start = System.currentTimeMillis();
       VpTree<SphericalPoint> tree = new VpTree<>();
@@ -87,11 +86,11 @@ public class PerformanceTest {
       }
     }
     System.out.println("Build time:");
-    System.out.println("      Simple Tree: " + simpleBuildTime + "ms");
+//    System.out.println("      Simple Tree: " + simpleBuildTime + "ms");
     System.out.println("    VP Tree(bulk): " + vpBulkBuildTime + "ms");
     System.out.println(" VP Tree(Dynamic): " + vpDynamicBuildTime + "ms");
     System.out.println("Find time:");
-    System.out.println("      Simple Tree: " + simpleFindTime / 1000000d + "ms");
+//    System.out.println("      Simple Tree: " + simpleFindTime / 1000000d + "ms");
     System.out.println("    VP Tree(bulk): " + vpBulkFindTime / 1000000d + "ms");
     System.out.println(" VP Tree(Dynamic): " + vpDynamicFindTime / 1000000d + "ms");
   }

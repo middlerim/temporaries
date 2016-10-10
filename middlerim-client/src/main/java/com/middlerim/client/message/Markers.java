@@ -19,8 +19,8 @@ public final class Markers {
   public static final InvalidData INVALID_DATA = new InvalidData();
   public static final InvalidData NOTFOUND = new InvalidData();
   public static final Exit EXIT = new Exit();
+  public static final AssignAID ASSIGN_AID = new AssignAID();
 
-  
   private static final class Received implements Outbound, ControlMessage {
     private static final int FIXED_BYTE_SIZE = 9;
 
@@ -97,4 +97,23 @@ public final class Markers {
     }
   }
 
+  private static final class AssignAID implements Outbound, ControlMessage {
+
+    private static final int FIXED_BYTE_SIZE = 9;
+
+    private AssignAID() {
+    }
+
+    @Override
+    public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
+      byte[] sessionId = new byte[8];
+      recipient.sessionId.readBytes(sessionId);
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ASSIGN_AID).writeBytes(sessionId), recipient.address));
+    }
+
+    @Override
+    public int byteSize() {
+      return FIXED_BYTE_SIZE;
+    }
+  }
 }

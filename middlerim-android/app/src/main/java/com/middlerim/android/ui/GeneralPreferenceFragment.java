@@ -28,9 +28,6 @@ public class GeneralPreferenceFragment extends PreferenceFragmentCompat {
         ((Middlerim) getActivity()).getSupportActionBar().hide();
         addPreferencesFromResource(R.xml.pref_general);
         setHasOptionsMenu(true);
-
-        System.out.println(findPreference("example_text"));
-        System.out.println(findPreference("example_list"));
     }
 
     @Override

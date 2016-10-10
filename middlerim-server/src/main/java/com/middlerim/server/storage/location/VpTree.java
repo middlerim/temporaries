@@ -7,15 +7,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import com.middlerim.server.MessageCommands;
 import com.middlerim.session.SessionId;
 
 public class VpTree<T extends TreePoint<T>> implements LocationStorage<T> {
 
-  private static final int MAX_LEAF_SIZE = 20;
-  private static final int VANTAGE_POINT_CANDIDATES = 10;
-  private static final int TEST_POINT_COUNT = 10;
+  private static final ExecutorService executor = Executors.newFixedThreadPool(2);
+
+  private static final int MAX_LEAF_SIZE = 25;
+  private static final int VANTAGE_POINT_CANDIDATES = 9;
+  private static final int TEST_POINT_COUNT = 9;
 
   private VpTreeNode<T> root;
   Map<SessionId, T> userLocationMap = new HashMap<>();
@@ -211,13 +217,35 @@ public class VpTree<T extends TreePoint<T>> implements LocationStorage<T> {
     }
   }
 
+  private static class NodeBuilderTask<T extends TreePoint<T>> implements Callable<VpTreeNode<T>> {
+
+    private List<T> points;
+    private int level;
+
+    private NodeBuilderTask(List<T> points, int level) {
+      this.points = points;
+      this.level = level;
+    }
+
+    @Override
+    public VpTreeNode<T> call() throws Exception {
+      return buildTreeNode(points, level);
+    }
+  }
+
+  private static <T extends TreePoint<T>> Future<VpTreeNode<T>> buildTreeNodeAsync(List<T> points, int level) {
+    NodeBuilderTask<T> task = new NodeBuilderTask<>(points, level);
+    return executor.submit(task);
+  }
+
   private static <T extends TreePoint<T>> VpTreeNode<T> buildTreeNode(List<T> points, int level) {
+    level++;
     VpTreeNode<T> node = new VpTreeNode<T>();
     if (points.size() <= MAX_LEAF_SIZE) {
       node.leaves = points;
       return node;
     }
-     T basePoint = chooseNewVantagePoint(points);
+    T basePoint = chooseNewVantagePoint(points);
     TreeSet<DistanceHolder<T>> sorted = new TreeSet<>();
 
     for (int i = 0; i < points.size(); ++i) {
@@ -244,27 +272,47 @@ public class VpTree<T extends TreePoint<T>> implements LocationStorage<T> {
     node.vantagePoint = basePoint;
     node.leftRadiusMeter = medianDistance;
 
-    if (!leftPoints.isEmpty()) {
-      if (medianDistance <= MessageCommands.MIN_METER) {
-        node.left = new VpTreeNode<T>();
-        node.left.leaves = leftPoints;
-      } else if (leftPoints.size() > MAX_LEAF_SIZE && rightPoints.isEmpty()) {
-        node.left = new VpTreeNode<T>();
-        node.left.leaves = leftPoints;
-      } else {
-        node.left = buildTreeNode(leftPoints, ++level);
+    try {
+      Future<VpTreeNode<T>> leftFuture = null;
+      Future<VpTreeNode<T>> rightFuture = null;
+      if (!leftPoints.isEmpty()) {
+        if (medianDistance <= MessageCommands.MIN_METER) {
+          node.left = new VpTreeNode<T>();
+          node.left.leaves = leftPoints;
+        } else if (leftPoints.size() > MAX_LEAF_SIZE && rightPoints.isEmpty()) {
+          node.left = new VpTreeNode<T>();
+          node.left.leaves = leftPoints;
+        } else {
+          if (level == 1 && leftPoints.size() > 10_000) {
+            leftFuture = buildTreeNodeAsync(leftPoints, level);
+          } else {
+            node.left = buildTreeNode(leftPoints, level);
+          }
+        }
       }
+      if (!rightPoints.isEmpty()) {
+        if (level == 1 && rightPoints.size() > 10_000) {
+          rightFuture = buildTreeNodeAsync(rightPoints, level);
+        } else {
+          node.right = buildTreeNode(rightPoints, level);
+        }
+      }
+      if (leftFuture != null) {
+        node.left = leftFuture.get();
+      }
+      if (rightFuture != null) {
+        node.right = rightFuture.get();
+      }
+      if (node.left == null && node.right != null) {
+        throw new IllegalStateException();
+      }
+    } catch (Exception e) {
+      throw new RuntimeException("Unexpected exception", e);
     }
-    if (!rightPoints.isEmpty()) {
-      node.right = buildTreeNode(rightPoints, ++level);
-    }
-    if (node.left == null && node.right != null) {
-      throw new IllegalStateException();
-    }
+
     return node;
   }
 
-  /** Trying to choose a new vantage point with highest distance deviation to other nodes. */
   private static <T extends TreePoint<T>> T chooseNewVantagePoint(List<T> points) {
     List<T> candidates = new ArrayList<>(VANTAGE_POINT_CANDIDATES);
     List<T> testPoints = new ArrayList<>(TEST_POINT_COUNT);

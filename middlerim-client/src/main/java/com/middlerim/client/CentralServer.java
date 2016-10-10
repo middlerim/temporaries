@@ -14,6 +14,8 @@ import com.middlerim.client.message.Text;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.client.view.ViewContext;
 import com.middlerim.client.view.ViewEvents;
+import com.middlerim.session.Session;
+import com.middlerim.session.SessionId;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.AdaptiveRecvByteBufAllocator;
@@ -56,6 +58,9 @@ public class CentralServer {
         if (!f.isSuccess()) {
           CentralEvents.fireError("E_000", f.cause());
           return;
+        }
+        if (Sessions.getSession() == null) {
+          f.channel().writeAndFlush(new OutboundMessage<>(Session.create(SessionId.ANONYMOUS, serverAddress), Markers.ASSIGN_AID));
         }
         initializeEventListeners(f.channel());
         CentralEvents.fireStarted();
