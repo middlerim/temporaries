@@ -7,7 +7,7 @@ public class Point implements Comparable<Point> {
   public final int latitude;
   public final int longitude;
 
-  public static Point forTest(double latitude, double longtitude) {
+  public static Point convert(double latitude, double longtitude) {
     return new Point((int) (latitude * GETA), (int) (longtitude * GETA));
   }
 

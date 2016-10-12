@@ -87,7 +87,7 @@ public class InboundDataHandlerTest {
 
     assertNull(channel.readOutbound());
     SessionId sessionId = new SessionId(new byte[]{0, 0, 0, 1, 0, 0, 7, 8});
-    Point expectedUserLocation = Point.forTest(1, 1);
+    Point expectedUserLocation = Point.convert(1, 1);
     LocationStorage.Entry ul = Locations.findBySessionId(sessionId);
     assertEquals(expectedUserLocation, ul.point());
     assertEquals(1, Locations.size());
@@ -108,14 +108,14 @@ public class InboundDataHandlerTest {
     {
       // User 1
       SessionId sessionId = new SessionId(new byte[]{0, 0, 0, 1, 0, 0, 7, 8});
-      Point expectedUserLocation = Point.forTest(1, 1);
+      Point expectedUserLocation = Point.convert(1, 1);
       LocationStorage.Entry ul = Locations.findBySessionId(sessionId);
       assertEquals(expectedUserLocation, ul.point());
     }
     {
       // User 2
       SessionId sessionId = new SessionId(new byte[]{0, 0, 0, 2, 0, 0, 2, 1});
-      Point expectedUserLocation = Point.forTest(1, 2);
+      Point expectedUserLocation = Point.convert(1, 2);
       LocationStorage.Entry ul = Locations.findBySessionId(sessionId);
       assertEquals(expectedUserLocation, ul.point());
     }
@@ -138,14 +138,14 @@ public class InboundDataHandlerTest {
     {
       // User 1
       SessionId sessionId = new SessionId(new byte[]{0, 0, 0, 1, 0, 0, 7, 8});
-      Point expectedUserLocation = Point.forTest(Bytes.bytesToInt(new byte[]{1, 2, 3, 4}), Bytes.bytesToInt(new byte[]{1, 2, 3, 4}));
+      Point expectedUserLocation = Point.convert(Bytes.bytesToInt(new byte[]{1, 2, 3, 4}), Bytes.bytesToInt(new byte[]{1, 2, 3, 4}));
       LocationStorage.Entry ul = Locations.findBySessionId(sessionId);
       assertEquals(expectedUserLocation, ul.point());
     }
     {
       // User 2
       SessionId sessionId = new SessionId(new byte[]{0, 0, 0, 2, 0, 0, 2, 1});
-      Point expectedUserLocation = Point.forTest(1, 1);
+      Point expectedUserLocation = Point.convert(1, 1);
       LocationStorage.Entry ul = Locations.findBySessionId(sessionId);
       assertEquals(expectedUserLocation, ul.point());
     }
@@ -167,7 +167,7 @@ public class InboundDataHandlerTest {
       assertNull(channel.readOutbound());
 
       SessionId sessionId = new SessionId(new byte[]{0, 0, 0, 1, 0, 0, 7, 8});
-      Point expectedUserLocation = Point.forTest(1, 2);
+      Point expectedUserLocation = Point.convert(1, 2);
       LocationStorage.Entry ul = Locations.findBySessionId(sessionId);
       assertEquals(expectedUserLocation, ul.point());
       assertEquals(1, Locations.size());
@@ -179,7 +179,7 @@ public class InboundDataHandlerTest {
       assertNull(channel.readOutbound());
 
       SessionId sessionId = new SessionId(new byte[]{0, 0, 0, 1, 0, 0, 7, 8});
-      Point expectedUserLocation = Point.forTest(1, 2);
+      Point expectedUserLocation = Point.convert(1, 2);
       LocationStorage.Entry ul = Locations.findBySessionId(sessionId);
       assertEquals(expectedUserLocation, ul.point());
       assertEquals(1, Locations.size());

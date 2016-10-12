@@ -60,14 +60,22 @@ public class CentralServer {
           return;
         }
         if (Sessions.getSession() == null) {
-          f.channel().writeAndFlush(new OutboundMessage<>(Session.create(SessionId.ANONYMOUS, serverAddress), Markers.ASSIGN_AID));
+          Session anonymous = Session.create(SessionId.ANONYMOUS, serverAddress);
+          Sessions.setSession(anonymous);
+          f.channel().writeAndFlush(new OutboundMessage<>(anonymous, Markers.ASSIGN_AID));
+          // #postCreateServer() is going to be called after receive the response.
+        } else {
+          postCreateServer(f.channel());
         }
-        initializeEventListeners(f.channel());
-        CentralEvents.fireStarted();
       }
     });
     closeFuture = bootFuture.channel().closeFuture();
     return closeFuture;
+  }
+
+  public static void postCreateServer(Channel c) {
+    initializeEventListeners(c);
+    CentralEvents.fireStarted();
   }
 
   private static Bootstrap createBootstrap() {
@@ -80,7 +88,6 @@ public class CentralServer {
           public void initChannel(final DatagramChannel ch) throws Exception {
             ch.pipeline().addLast(handlers);
           }
-
           @Override
           public boolean isSharable() {
             return true;

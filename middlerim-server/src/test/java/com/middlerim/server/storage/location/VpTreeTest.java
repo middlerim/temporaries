@@ -58,27 +58,27 @@ public class VpTreeTest {
   @Test
   public void testNorthPole() {
     VpTree<SphericalPoint> tree = new VpTree<>();
-    tree.put(new SphericalPoint(createDummySession(1), Point.forTest(89.9, 70.9)));
-    tree.put(new SphericalPoint(createDummySession(2), Point.forTest(89.93109563906, 289.31721675720837)));
-    tree.put(new SphericalPoint(createDummySession(3), Point.forTest(89.93109563906, -290.55865037515025)));
-    tree.put(new SphericalPoint(createDummySession(4), Point.forTest(-89.93109563906, 70.9)));
+    tree.put(new SphericalPoint(createDummySession(1), Point.convert(89.9, 70.9)));
+    tree.put(new SphericalPoint(createDummySession(2), Point.convert(89.93109563906, 289.31721675720837)));
+    tree.put(new SphericalPoint(createDummySession(3), Point.convert(89.93109563906, -290.55865037515025)));
+    tree.put(new SphericalPoint(createDummySession(4), Point.convert(-89.93109563906, 70.9)));
 
     List<SphericalPoint> results = tree.findAround(createDummySession(1).sessionId, MessageCommands.areaKM(16));
     assertThat(results.size(), is(1));
-    assertThat(results.get(0).point(), is(Point.forTest(89.93109563906, -290.55865037515025)));
+    assertThat(results.get(0).point(), is(Point.convert(89.93109563906, -290.55865037515025)));
   }
 
   @Test
   public void testSouthPole() {
     VpTree<SphericalPoint> tree = new VpTree<>();
-    tree.put(new SphericalPoint(createDummySession(1), Point.forTest(-89.9, 70.9)));
-    tree.put(new SphericalPoint(createDummySession(2), Point.forTest(-89.93109563906, 289.31721675720837)));
-    tree.put(new SphericalPoint(createDummySession(3), Point.forTest(-89.93109563906, -290.55865037515025)));
-    tree.put(new SphericalPoint(createDummySession(4), Point.forTest(89.93109563906, 70.9)));
+    tree.put(new SphericalPoint(createDummySession(1), Point.convert(-89.9, 70.9)));
+    tree.put(new SphericalPoint(createDummySession(2), Point.convert(-89.93109563906, 289.31721675720837)));
+    tree.put(new SphericalPoint(createDummySession(3), Point.convert(-89.93109563906, -290.55865037515025)));
+    tree.put(new SphericalPoint(createDummySession(4), Point.convert(89.93109563906, 70.9)));
 
     List<SphericalPoint> results = tree.findAround(createDummySession(1).sessionId, MessageCommands.areaKM(16));
     assertThat(results.size(), is(1));
-    assertThat(results.get(0).point(), is(Point.forTest(-89.93109563906, -290.55865037515025)));
+    assertThat(results.get(0).point(), is(Point.convert(-89.93109563906, -290.55865037515025)));
   }
   @Test
   public void test_findBySessionId() {
@@ -94,7 +94,7 @@ public class VpTreeTest {
     }
     {
       // 1
-      Point location = Point.forTest(1, 1);
+      Point location = Point.convert(1, 1);
       Session session = Session.create(userA, sender);
       tree.put(new SphericalPoint(session, location));
       SphericalPoint result = tree.findBySessionId(userA);
@@ -104,7 +104,7 @@ public class VpTreeTest {
     }
     {
       // 2
-      Point location = Point.forTest(2, 2);
+      Point location = Point.convert(2, 2);
       Session session = Session.create(userB, sender);
       tree.put(new SphericalPoint(session, location));
       SphericalPoint result = tree.findBySessionId(userB);
@@ -114,7 +114,7 @@ public class VpTreeTest {
     }
     {
       // Same user as 1
-      Point location = Point.forTest(3, 3);
+      Point location = Point.convert(3, 3);
       Session session = Session.create(userA, sender);
       tree.put(new SphericalPoint(session, location));
       SphericalPoint result = tree.findBySessionId(userA);
@@ -129,15 +129,15 @@ public class VpTreeTest {
   public void test_findAround() {
     InetSocketAddress sender = DatagramSocketAddress.createUnresolved("localhost", 44445);
     SessionId userA = new SessionId(new byte[]{1, 2, 3, 4, 5, 6, 7, 8});
-    Point locationA = Point.forTest(1, 1); // -> 2
+    Point locationA = Point.convert(1, 1); // -> 2
     SessionId userB = new SessionId(new byte[]{2, 2, 3, 4, 5, 6, 7, 8});
-    Point locationB = Point.forTest(1.3, 1); // -> 2.4
+    Point locationB = Point.convert(1.3, 1); // -> 2.4
     SessionId userC = new SessionId(new byte[]{3, 2, 3, 4, 5, 6, 7, 8});
-    Point locationC = Point.forTest(1.7, 1);
+    Point locationC = Point.convert(1.7, 1);
     SessionId userD = new SessionId(new byte[]{4, 2, 3, 4, 5, 6, 7, 8});
-    Point locationD = Point.forTest(4, 1);
+    Point locationD = Point.convert(4, 1);
     SessionId userE = new SessionId(new byte[]{5, 2, 3, 4, 5, 6, 7, 8});
-    Point locationE = Point.forTest(3.1, 1);
+    Point locationE = Point.convert(3.1, 1);
 
     VpTree<SphericalPoint> tree = new VpTree<>();
     int km = 80;
@@ -170,7 +170,7 @@ public class VpTreeTest {
     }
     {
       // Set userB outside of userA.
-      locationB = Point.forTest(2.4, 1);
+      locationB = Point.convert(2.4, 1);
       Session session = Session.create(userB, sender);
       tree.put(new SphericalPoint(session, locationB));
       List<SphericalPoint> result = tree.findAround(userA, MessageCommands.areaKM(km));
@@ -196,7 +196,7 @@ public class VpTreeTest {
       // Move userA within 80km of userB and userC.
       // C < A < B
       Session session = Session.create(userA, sender);
-      locationA = Point.forTest(2, 1);
+      locationA = Point.convert(2, 1);
       tree.put(new SphericalPoint(session, locationA));
       assertThat(tree.size(), is(3));
       List<SphericalPoint> resultA = tree.findAround(userA, MessageCommands.areaKM(km));

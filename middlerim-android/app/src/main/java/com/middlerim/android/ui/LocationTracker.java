@@ -25,7 +25,7 @@ public class LocationTracker {
 
         @Override
         public void onLocationChanged(Location location) {
-            ViewEvents.fireLocationUpdate(new Point(location.getLatitude(), location.getLongitude()));
+            ViewEvents.fireLocationUpdate(Point.convert(location.getLatitude(), location.getLongitude()));
         }
 
         @Override

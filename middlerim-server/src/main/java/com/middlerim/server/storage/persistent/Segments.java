@@ -27,11 +27,13 @@ class Segments<L extends Persistent> {
     this.info = info;
     if (Config.TEST) {
       this.segmentSize = 160 - (160 % info.recordSize());
-    } else {
+    } else if (info.maxStorageSize() > Config.MAX_STORAGE_SEGMENT_SIZE) {
       this.segmentSize = Config.MAX_STORAGE_SEGMENT_SIZE - (Config.MAX_STORAGE_SEGMENT_SIZE % info.recordSize());
+    } else {
+      this.segmentSize = info.maxStorageSize();
     }
     LOG.info("Created segments for {}: a segment size: {} byte, max storage size: {} byte", info.storageId(), segmentSize, info.maxStorageSize());
-    this.fcs = new FileChannel[channelIndex(info.maxStorageSize()) + 1];
+    this.fcs = new FileChannel[(int) (Math.floor((double) info.maxStorageSize() / this.segmentSize)) + 1];
     LOG.info("                max file channel size: {}", fcs.length);
     this.putItem = ByteBuffer.allocate(info.recordSize());
     this.putItem.position(0);
@@ -64,6 +66,7 @@ class Segments<L extends Persistent> {
       f.setLength(segmentSize);
       fc = f.getChannel();
       fcs[chIndex] = fc;
+      BackgroundService.closeOnShutdown(fc);
     } else if (!fc.isOpen()) {
       fcs[chIndex] = null;
       return getChannel(id);

@@ -10,95 +10,95 @@ public class PointTest {
 
   @Test
   public void testWithIn() {
-    Point a = Point.forTest(1, 1);
-    Point b = Point.forTest(1, 1);
+    Point a = Point.convert(1, 1);
+    Point b = Point.convert(1, 1);
     assertTrue(a.distanceMeter(b) == 0);
 
-    a = Point.forTest(-1d, -1d);
-    b = Point.forTest(-1d, -1d);
+    a = Point.convert(-1d, -1d);
+    b = Point.convert(-1d, -1d);
     assertTrue(a.distanceMeter(b) == 0);
 
-    a = Point.forTest(0d, 0d);
-    b = Point.forTest(0d, 0d);
+    a = Point.convert(0d, 0d);
+    b = Point.convert(0d, 0d);
     assertTrue(a.distanceMeter(b) == 0);
 
-    a = Point.forTest(-1d, -1d);
-    b = Point.forTest(-1.1d, -1.1d);
+    a = Point.convert(-1d, -1d);
+    b = Point.convert(-1.1d, -1.1d);
     assertThat(a.distanceMeter(b), is(157_41));
 
-    a = Point.forTest(0d, 0d);
-    b = Point.forTest(0.705, 0.705);
+    a = Point.convert(0d, 0d);
+    b = Point.convert(0.705, 0.705);
     assertThat(a.distanceMeter(b), is(110_986));
 
-    b = Point.forTest(-0.7, -0.7);
+    b = Point.convert(-0.7, -0.7);
     assertThat(a.distanceMeter(b), is(110_199));
 
-    a = Point.forTest(-1d, -1d);
-    b = Point.forTest(-0.3d, -0.3d);
+    a = Point.convert(-1d, -1d);
+    b = Point.convert(-0.3d, -0.3d);
     assertThat(a.distanceMeter(b), is(110_196));
 
-    a = Point.forTest(-1d, -1d);
-    b = Point.forTest(-0.29, -0.29);
+    a = Point.convert(-1d, -1d);
+    b = Point.convert(-0.29, -0.29);
     assertThat(a.distanceMeter(b), is(111_772));
 
-    a = Point.forTest(-359.343292844065, -359.6588680149514);
-    b = Point.forTest(90.2, 70.9);
+    a = Point.convert(-359.343292844065, -359.6588680149514);
+    b = Point.convert(90.2, 70.9);
     assertThat(a.distanceMeter(b), is(9953060));
 
-    a = Point.forTest(5.10026, 5.10026);
-    b = Point.forTest(5.1, 5.1);
+    a = Point.convert(5.10026, 5.10026);
+    b = Point.convert(5.1, 5.1);
     assertThat(a.distanceMeter(b), is(40));
   }
 
   @Test
   public void testDistanceSimple() {
-    Point a = Point.forTest(1.1d, 1.1d);
-    Point b = Point.forTest(1.1d, 1.1d);
+    Point a = Point.convert(1.1d, 1.1d);
+    Point b = Point.convert(1.1d, 1.1d);
     assertThat(a.distanceSimple(b), is(0));
 
-    a = Point.forTest(1.1d, 1.1d);
-    b = Point.forTest(-1.1d, -1.1d);
+    a = Point.convert(1.1d, 1.1d);
+    b = Point.convert(-1.1d, -1.1d);
     assertThat(a.distanceSimple(b), is(440000));
 
-    a = Point.forTest(1.1d, 1.1d);
-    b = Point.forTest(2.1d, 2.1d);
+    a = Point.convert(1.1d, 1.1d);
+    b = Point.convert(2.1d, 2.1d);
     assertThat(a.distanceSimple(b), is(200000));
 
-    a = Point.forTest(-1d, -1d);
-    b = Point.forTest(1.1d, 1.1d);
+    a = Point.convert(-1d, -1d);
+    b = Point.convert(1.1d, 1.1d);
     assertThat(a.distanceSimple(b), is(420000));
 
-    a = Point.forTest(-1.1d, -1.1d);
-    b = Point.forTest(-2.2d, -2.2d);
+    a = Point.convert(-1.1d, -1.1d);
+    b = Point.convert(-2.2d, -2.2d);
     assertThat(a.distanceSimple(b), is(220000));
 
-    a = Point.forTest(1.111d, -1.111d);
-    b = Point.forTest(-1.111d, 1.111d);
+    a = Point.convert(1.111d, -1.111d);
+    b = Point.convert(-1.111d, 1.111d);
     assertThat(a.distanceSimple(b), is(444400));
 
-    a = Point.forTest(-1.111d, 1.111d);
-    b = Point.forTest(1.111d, -1.111d);
+    a = Point.convert(-1.111d, 1.111d);
+    b = Point.convert(1.111d, -1.111d);
     assertThat(a.distanceSimple(b), is(444400));
   }
 
   private double rad(double deg) {
-    return deg  * Math.PI / 180;
+    return deg * Math.PI / 180;
   }
-  
+
   @Test
   public void testRadians() {
-    Point a = Point.forTest(1d, 1d);
+    Point a = Point.convert(1d, 1d);
     assertThat(Point.radians(a.latitude), is(rad(1)));
   }
-  
+
   @Ignore
   @Test
   public void testDistanceMeterSimple() {
     double d3 = 0;
     int d4 = 0;
     for (int i = 0; i < 1000; ++i) {
-      Point a = Point.forTest(((Math.random() * i) % 180) - 90.1, ((Math.random() * i) % 360) - 180.1);
-      Point b = Point.forTest(((Math.random() * i) % 180) - 90.1, ((Math.random() * i) % 360) - 180.1);
+      Point a = Point.convert(((Math.random() * i) % 180) - 90.1, ((Math.random() * i) % 360) - 180.1);
+      Point b = Point.convert(((Math.random() * i) % 180) - 90.1, ((Math.random() * i) % 360) - 180.1);
       double d1 = a.distanceSimple(b);
       int d2 = a.distanceMeter(b);
       if (i == 0) {

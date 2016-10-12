@@ -10,15 +10,17 @@ public final class CentralEvents {
   private static final List<Listener<ErrorEvent>> errorListeners = new ArrayList<>(1);
   private static final List<Listener<ReceiveMessageEvent>> receiveMessageListeners = new ArrayList<>(1);
   private static final List<Listener<ReceivedEvent>> receivedListeners = new ArrayList<>(1);
+  private static final List<Listener<LostMessageEvent>> lostMessageListeners = new ArrayList<>(1);
 
   public static void removeListener(Listener<? extends Event> listener) {
     startedListeners.remove(listener);
     errorListeners.remove(listener);
     receiveMessageListeners.remove(listener);
     receivedListeners.remove(listener);
+    lostMessageListeners.remove(listener);
   }
 
-  private static <E extends Event > void addListener(Listener<E> listener, List<Listener<E>> ls) {
+  private static <E extends Event> void addListener(Listener<E> listener, List<Listener<E>> ls) {
     if (ls.contains(listener)) {
       throw new IllegalStateException();
     }
@@ -39,6 +41,10 @@ public final class CentralEvents {
 
   public static void onReceived(Listener<ReceivedEvent> listener) {
     addListener(listener, receivedListeners);
+  }
+
+  public static void onLostMessage(Listener<LostMessageEvent> listener) {
+    addListener(listener, lostMessageListeners);
   }
 
   public static interface Listener<EV extends Event> {
@@ -77,6 +83,14 @@ public final class CentralEvents {
     }
   }
 
+  public static class LostMessageEvent implements Event {
+    public final short sequenceNo;
+
+    private LostMessageEvent(short sequenceNo) {
+      this.sequenceNo = sequenceNo;
+    }
+  }
+
   private static <E extends Event> void handleEvent(E event, List<Listener<E>> ls) {
     for (Listener<E> l : ls) {
       l.handle(event);
@@ -97,5 +111,9 @@ public final class CentralEvents {
 
   public static void fireReceived(short sequenceNo) {
     handleEvent(new ReceivedEvent(sequenceNo), receivedListeners);
+  }
+
+  public static void fireLostMessage(short sequenceNo) {
+    handleEvent(new LostMessageEvent(sequenceNo), lostMessageListeners);
   }
 }

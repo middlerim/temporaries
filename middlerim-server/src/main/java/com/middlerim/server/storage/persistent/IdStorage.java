@@ -28,12 +28,11 @@ public class IdStorage {
       fc = getChannel();
     } catch (IOException e) {
       throw new RuntimeException("Could not open or create file. path: " + info.path(), e);
-    } finally {
-      close();
     }
     this.buf = ByteBuffer.allocate(Long.BYTES);
     this.buf.position(0);
     this.buf.mark();
+    BackgroundService.closeOnShutdown(fc);
   }
 
   private FileChannel getChannel() throws IOException {
@@ -78,7 +77,12 @@ public class IdStorage {
   public synchronized long incrementAndGet() throws IOException {
     buf.reset();
     fc.position(0).read(buf);
-    long id = buf.getLong();
+    long id;
+    if (buf.position() != 0) {
+      id = buf.getLong(0);
+    } else {
+      id = info.minValue();
+    }
     if (id < info.minValue() || id > info.maxValue()) {
       id = info.minValue();
     } else {
@@ -87,4 +91,6 @@ public class IdStorage {
     buf.putLong(0, id);
     return id;
   }
+  
+  
 }

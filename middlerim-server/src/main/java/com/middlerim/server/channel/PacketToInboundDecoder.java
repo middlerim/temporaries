@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 
 import com.middlerim.location.Point;
 import com.middlerim.message.Outbound;
+import com.middlerim.server.Config;
 import com.middlerim.server.Headers;
 import com.middlerim.server.message.Location;
 import com.middlerim.server.message.Markers;
@@ -52,6 +53,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       }
       Session anonymous = Sessions.getOrCreateSession(SessionId.ANONYMOUS, msg.sender());
       ctx.channel().write(new OutboundMessage<>(anonymous, Markers.ASSIGN_AID));
+      return;
     }
 
     byte[] tokenBytes = new byte[8];
@@ -157,7 +159,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
     ctx.channel().writeAndFlush(new OutboundMessage<>(ctx.channel().attr(AttributeKeys.SESSION).get(), Markers.INVALID_DATA));
     // Ignore BufferUnderFlowException since length of the packet isn't validated deliberately in advance.
-    if (!(cause instanceof BufferUnderflowException || (cause.getCause() != null && cause.getCause() instanceof BufferUnderflowException))) {
+    if (Config.TEST | !(cause instanceof BufferUnderflowException || (cause.getCause() != null && cause.getCause() instanceof BufferUnderflowException))) {
       LOG.error("Unexpected exception", cause);
     }
   }

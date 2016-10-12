@@ -17,7 +17,10 @@ import com.middlerim.session.SessionListener;
 
 public final class Sessions {
   private static LinkedList<Session> sessionQueue = new LinkedList<>();
-  private static final IdStorage aidStorage = new IdStorage(new IdStorageInformation("aid", SessionId.ANONYMOUS_USER_FROM, SessionId.ANONYMOUS_USER_TO));
+  private static final IdStorage aidStorage = new IdStorage(
+      Config.TEST
+          ? new IdStorageInformation("aid", 1, 10000)
+          : new IdStorageInformation("aid", SessionId.ANONYMOUS_USER_FROM, SessionId.ANONYMOUS_USER_TO));
 
   private static Map<SessionId, Session> sessionMap = new HashMap<>();
 

@@ -118,7 +118,7 @@ public class ConsoleClient {
       System.out.println("Enter Point >");
       String point = br.readLine();
       String[] points = point.split(":");
-      ViewEvents.fireLocationUpdate(new Point((int)(Double.parseDouble(points[0]) * Point.GETA), (int)(Double.parseDouble(points[1]) * Point.GETA)));
+      ViewEvents.fireLocationUpdate(Point.convert(Double.parseDouble(points[0]), Double.parseDouble(points[1])));
     } else if ("B".equals(s)) {
       System.out.println("Enter Message >");
       String message = br.readLine();

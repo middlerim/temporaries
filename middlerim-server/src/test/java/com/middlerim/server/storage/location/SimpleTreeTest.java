@@ -82,13 +82,13 @@ public class SimpleTreeTest {
     SessionId userA = new SessionId(new byte[]{1, 2, 3, 4, 5, 6, 7, 8});
     Point locationA = new Point(1, 1); // -> 2
     SessionId userB = new SessionId(new byte[]{2, 2, 3, 4, 5, 6, 7, 8});
-    Point locationB = Point.forTest(1.3, 1); // -> 2.4
+    Point locationB = Point.convert(1.3, 1); // -> 2.4
     SessionId userC = new SessionId(new byte[]{3, 2, 3, 4, 5, 6, 7, 8});
-    Point locationC = Point.forTest(1.7, 1);
+    Point locationC = Point.convert(1.7, 1);
     SessionId userD = new SessionId(new byte[]{4, 2, 3, 4, 5, 6, 7, 8});
-    Point locationD = Point.forTest(4, 1);
+    Point locationD = Point.convert(4, 1);
     SessionId userE = new SessionId(new byte[]{5, 2, 3, 4, 5, 6, 7, 8});
-    Point locationE = Point.forTest(3.1, 1);
+    Point locationE = Point.convert(3.1, 1);
 
     int km = 80;
     {
@@ -120,7 +120,7 @@ public class SimpleTreeTest {
     }
     {
       // Set userB outside of userA.
-      locationB = Point.forTest(2.4, 1);
+      locationB = Point.convert(2.4, 1);
       Session session = Session.create(userB, sender);
       tree.put(new SimpleTree.Entry(session, locationB));
       List<Entry> result = tree.findAround(userA, MessageCommands.areaKM(km));

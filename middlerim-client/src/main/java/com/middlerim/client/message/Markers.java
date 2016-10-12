@@ -2,6 +2,7 @@ package com.middlerim.client.message;
 
 import com.middlerim.client.CentralServer;
 import com.middlerim.message.ControlMessage;
+import com.middlerim.message.Inbound;
 import com.middlerim.message.Outbound;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
@@ -97,18 +98,26 @@ public final class Markers {
     }
   }
 
-  private static final class AssignAID implements Outbound, ControlMessage {
+  private static final class AssignAID implements Inbound, Outbound, ControlMessage {
 
-    private static final int FIXED_BYTE_SIZE = 9;
-
+    private static final int FIXED_BYTE_SIZE = 1;
+    private static boolean called = false;
     private AssignAID() {
     }
 
     @Override
+    public void processInput(ChannelHandlerContext ctx) {
+      // 
+      if (called) {
+        throw new IllegalStateException("Assign Anonymous ID response must be called only once.");
+      }
+      called = true;
+      CentralServer.postCreateServer(ctx.channel());
+    }
+
+    @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      byte[] sessionId = new byte[8];
-      recipient.sessionId.readBytes(sessionId);
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ASSIGN_AID).writeBytes(sessionId), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ASSIGN_AID), recipient.address));
     }
 
     @Override

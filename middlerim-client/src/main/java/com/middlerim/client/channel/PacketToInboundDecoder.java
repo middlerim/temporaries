@@ -14,12 +14,11 @@ import com.middlerim.client.CentralEvents;
 import com.middlerim.client.CentralServer;
 import com.middlerim.client.Config;
 import com.middlerim.client.message.Markers;
+import com.middlerim.client.message.Messages;
 import com.middlerim.client.message.OutboundMessage;
 import com.middlerim.client.message.Text;
 import com.middlerim.client.session.Sessions;
-import com.middlerim.client.storage.MessageStorage;
 import com.middlerim.client.view.ViewContext;
-import com.middlerim.message.Outbound;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
@@ -52,6 +51,9 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       in.readBytes(tokenBytes);
       SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
       Sessions.setSession(Session.create(sessionId, CentralServer.serverAddress));
+      viewContext.logger().debug(NAME, "Received new anonymous session ID.");
+      out.add(Markers.ASSIGN_AID);
+      return;
     }
     Session session = Sessions.getSession();
     short sequenceNo = in.readShort();
@@ -59,35 +61,46 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     viewContext.logger().debug(NAME, "New packet: " + session + ":" + sequenceNo);
 
     if (header == Headers.AGAIN) {
-      Outbound lastSentMessage = MessageStorage.getSentMessage(sequenceNo);
+      OutboundMessage<?> lastSentMessage = Messages.getSentMessage(sequenceNo);
       if (lastSentMessage == null) {
         viewContext.logger().warn(NAME, "Was going to resent a message but the message is not found.");
+        CentralEvents.fireLostMessage(sequenceNo);
         return;
       }
-      if (session.sessionId.sequenceNo() != (sequenceNo + 1)) {
+      if (session.sessionId.sequenceNo() != sequenceNo) {
         viewContext.logger().warn(NAME, "Was going to resent a message but the sessionId.sequenceNo is invalid status.");
+        CentralEvents.fireLostMessage(sequenceNo);
+        return;
+      }
+      if (session.sessionId.retry() < Config.MAX_RETRY) {
+        viewContext.logger().warn(NAME, "Was going to resent a message but it has been retried " + Config.MAX_RETRY + " times.");
+        CentralEvents.fireLostMessage(sequenceNo);
+        return;
+      }
+      if (!lastSentMessage.recipient.address.getHostString().equals(msg.sender().getHostString())) {
+        viewContext.logger().warn(NAME, "Was requested re-seinding message request but denied it since it's from different server."
+            + lastSentMessage.recipient.address.getHostString() + ", " + msg.sender().getHostString());
+        CentralEvents.fireLostMessage(sequenceNo);
         return;
       }
       // Re-send the message.
-      if (session.sessionId.retry() < Config.MAX_RETRY) {
-        viewContext.logger().warn(NAME, "Was going to resent a message but it has been retried " + Config.MAX_RETRY + " times.");
-        return;
-      }
-      ctx.channel().writeAndFlush(new OutboundMessage<>(session, lastSentMessage));
+      ctx.channel().writeAndFlush(lastSentMessage);
       return;
     }
+    // sender address must be reset AFTER AGAIN logic.
+    session.address = msg.sender();
+
     if (header == Headers.RECEIVED) {
-      // TODO Send next message.
       CentralEvents.fireReceived(sequenceNo);
       return;
     }
     if (!session.sessionId.validateSequenceNoAndRefresh(sequenceNo)) {
-      // Must be sequential
+      // SequenceNo must be sequential.
       ctx.channel().write(new OutboundMessage<>(session, Markers.INVALID_SEQUENCE));
       return;
     }
     ctx.channel().writeAndFlush(new OutboundMessage<>(Sessions.getSession(), Markers.RECEIVED));
-    
+
     if (Headers.isMasked(header, Headers.FRAGMENT)) {
       int paylaadSize = in.readInt();
       int offset = in.readInt();
