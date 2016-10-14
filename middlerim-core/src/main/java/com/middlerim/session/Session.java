@@ -12,12 +12,20 @@ public class Session {
     return new Session(sessionId, System.currentTimeMillis(), address);
   }
 
+  public Session copyWithNewSequenceNo(short sequenceNo) {
+    return Session.create(sessionId.copyWithNewSequenceNo(sequenceNo), address);
+  }
+
   private Session(SessionId sessionId, long createTimeMillis, InetSocketAddress address) {
     this.sessionId = sessionId;
     this.createTimeMillis = createTimeMillis;
     this.address = address;
   }
 
+  public boolean isNotAssigned() {
+    return sessionId.userId() == SessionId.UNASSIGNED_USERID;
+  }
+  
   public boolean isNew() {
     return sessionId.status == SessionId.NEW;
   }

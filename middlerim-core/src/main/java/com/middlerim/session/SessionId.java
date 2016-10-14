@@ -7,6 +7,8 @@ public final class SessionId {
   static final byte NEW = 1;
   byte status = 0;
 
+  public static final long UNASSIGNED_USERID = 0;
+  public static final short UNASSIGNED_SEQUENCE_NO = 1;
   public static final long MAX_USER_SIZE = 42_949_672_95l;
   public static final long ANONYMOUS_USER_FROM = MAX_USER_SIZE - 2_000_000_000;
   public static final long ANONYMOUS_USER_TO = MAX_USER_SIZE;
@@ -20,7 +22,13 @@ public final class SessionId {
     this.userId = id;
     this.hashCode = (int) (userId ^ (userId >>> 32));
     this.retryCount = 0;
-    this.sequenceNo = (short) (Math.random() * Short.MAX_VALUE); // Assign random sequence no at first to prevent invalid access.
+    while (true) {
+      // Assign random sequence no at first to prevent invalid access.
+      this.sequenceNo = (short) (Math.random() * Short.MAX_VALUE);
+      if (this.sequenceNo != SessionId.UNASSIGNED_SEQUENCE_NO) {
+        break;
+      }
+    }
   }
 
   public SessionId(byte[] n) {
@@ -80,6 +88,14 @@ public final class SessionId {
   public short retry() {
     sequenceNo--;
     return ++retryCount;
+  }
+
+  public SessionId copyWithNewSequenceNo(short sequenceNo) {
+    byte[] bytes = new byte[8];
+    readBytes(bytes);
+    SessionId copied = new SessionId(bytes);
+    copied.sequenceNo = sequenceNo;
+    return copied;
   }
 
   @Override

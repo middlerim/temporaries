@@ -61,12 +61,7 @@ public class Middlerim extends AppCompatActivity {
 
         CentralEvents.onError(errorEventListener);
         ViewEvents.onStatusChange(statusChangeEventListener);
-        Location lastKnownLocation = androidContext.getLastKnownLocation();
-        if (lastKnownLocation != null) {
-            ViewEvents.fireLocationUpdate(new Point(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude()));
-        }
     }
-
 
     @Override
     protected void onPause() {

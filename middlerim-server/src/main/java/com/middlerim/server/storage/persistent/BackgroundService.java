@@ -28,12 +28,11 @@ public class BackgroundService<L extends Persistent> implements Runnable, Closea
     Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
       @Override
       public void run() {
-        System.out.println("Closing persistene resources");
         for (Closeable resource : RESOURCES) {
           try {
             resource.close();
           } catch (Exception e) {
-            e.printStackTrace();
+            e.printStackTrace(System.err);
           }
         }
       }
@@ -108,10 +107,10 @@ public class BackgroundService<L extends Persistent> implements Runnable, Closea
   void shutdownAndAwaitTermination(ExecutorService pool) {
     pool.shutdown();
     try {
-      if (!pool.awaitTermination(60, TimeUnit.SECONDS)) {
+      if (!pool.awaitTermination(6, TimeUnit.SECONDS)) {
         LOG.warn("Could have not closed the background storage service for 60 sec. Closing forcefully.");
         pool.shutdownNow();
-        if (!pool.awaitTermination(60, TimeUnit.SECONDS))
+        if (!pool.awaitTermination(3, TimeUnit.SECONDS))
           LOG.error("Could not close the background storage service.");
       }
     } catch (InterruptedException ie) {
@@ -121,6 +120,6 @@ public class BackgroundService<L extends Persistent> implements Runnable, Closea
   }
 
   static void closeOnShutdown(Closeable resource) {
-    RESOURCES.add(resource);
+    RESOURCES.add(0, resource);
   }
 }

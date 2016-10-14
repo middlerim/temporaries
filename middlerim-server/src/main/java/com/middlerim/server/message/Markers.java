@@ -1,6 +1,5 @@
 package com.middlerim.server.message;
 
-import com.middlerim.message.ControlMessage;
 import com.middlerim.message.Outbound;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
@@ -19,7 +18,7 @@ public final class Markers {
   public static final InvalidData NOTFOUND = new InvalidData();
   public static final AssignAID ASSIGN_AID = new AssignAID();
 
-  private static final class Received implements Outbound, ControlMessage {
+  private static final class Received implements Outbound {
 
     private static final int FIXED_BYTE_SIZE = 3;
 
@@ -37,7 +36,7 @@ public final class Markers {
     }
   }
 
-  private static final class InvalidSequence implements Outbound, ControlMessage {
+  private static final class InvalidSequence implements Outbound {
 
     private static final int FIXED_BYTE_SIZE = 3;
 
@@ -55,7 +54,7 @@ public final class Markers {
     }
   }
 
-  private static final class InvalidData implements Outbound, ControlMessage {
+  private static final class InvalidData implements Outbound {
 
     private static final int FIXED_BYTE_SIZE = 3;
 
@@ -73,7 +72,7 @@ public final class Markers {
     }
   }
 
-  private static final class AssignAID implements Outbound, ControlMessage {
+  private static final class AssignAID implements Outbound {
 
     private static final int FIXED_BYTE_SIZE = 9;
 

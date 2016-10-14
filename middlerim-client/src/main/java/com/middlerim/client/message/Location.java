@@ -2,7 +2,6 @@ package com.middlerim.client.message;
 
 import com.middlerim.client.CentralServer;
 import com.middlerim.location.Point;
-import com.middlerim.message.ControlMessage;
 import com.middlerim.message.Outbound;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
@@ -12,7 +11,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 
-public final class Location implements Outbound, ControlMessage {
+public final class Location implements Outbound {
   private static final int FIXED_BYTE_SIZE = 25;
   private final Point point;
 

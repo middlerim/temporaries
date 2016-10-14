@@ -63,19 +63,13 @@ public class CentralServer {
           Session anonymous = Session.create(SessionId.ANONYMOUS, serverAddress);
           Sessions.setSession(anonymous);
           f.channel().writeAndFlush(new OutboundMessage<>(anonymous, Markers.ASSIGN_AID));
-          // #postCreateServer() is going to be called after receive the response.
-        } else {
-          postCreateServer(f.channel());
         }
+        initializeEventListeners(f.channel());
+        CentralEvents.fireStarted();
       }
     });
     closeFuture = bootFuture.channel().closeFuture();
     return closeFuture;
-  }
-
-  public static void postCreateServer(Channel c) {
-    initializeEventListeners(c);
-    CentralEvents.fireStarted();
   }
 
   private static Bootstrap createBootstrap() {

@@ -52,7 +52,7 @@ public class MapFragment extends SupportMapFragment implements OnMapReadyCallbac
         }
         Location lastKnownLocation = androidContext.getLastKnownLocation();
         if (lastKnownLocation != null) {
-            movePosition(new Point(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude()), false);
+            movePosition(Point.convert(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude()), false);
         }
     }
 

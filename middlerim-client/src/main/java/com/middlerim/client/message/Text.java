@@ -5,6 +5,7 @@ import java.nio.ByteBuffer;
 import com.middlerim.client.CentralEvents;
 import com.middlerim.message.Inbound;
 import com.middlerim.message.Outbound;
+import com.middlerim.message.SequentialMessage;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
 
@@ -12,7 +13,7 @@ import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 
-public class Text implements Inbound, Outbound {
+public class Text implements Inbound, Outbound, SequentialMessage {
 
   public final ByteBuffer messageBytes;
   public final byte messageCommand;

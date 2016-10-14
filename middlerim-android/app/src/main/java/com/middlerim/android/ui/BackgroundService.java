@@ -61,7 +61,6 @@ public class BackgroundService extends IntentService {
 
     @Override
     protected void onHandleIntent(Intent workIntent) {
-        System.out.println(workIntent);
     }
 
     static boolean isStarted() {

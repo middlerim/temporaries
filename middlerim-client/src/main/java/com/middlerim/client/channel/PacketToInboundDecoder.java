@@ -47,12 +47,16 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     }
     byte header = in.readByte();
     if (header == Headers.ASSIGN_AID) {
+      if (!Sessions.getSession().isNotAssigned()) {
+        // Already assigned. It happens because it's not synchronizing while ASSIGN_AID is being requested.
+        return;
+      }
       byte[] tokenBytes = new byte[8];
       in.readBytes(tokenBytes);
       SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
       Sessions.setSession(Session.create(sessionId, CentralServer.serverAddress));
       viewContext.logger().debug(NAME, "Received new anonymous session ID.");
-      out.add(Markers.ASSIGN_AID);
+      CentralEvents.fireReceived(SessionId.UNASSIGNED_SEQUENCE_NO);
       return;
     }
     Session session = Sessions.getSession();
@@ -61,7 +65,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     viewContext.logger().debug(NAME, "New packet: " + session + ":" + sequenceNo);
 
     if (header == Headers.AGAIN) {
-      OutboundMessage<?> lastSentMessage = Messages.getSentMessage(sequenceNo);
+      OutboundMessage<?> lastSentMessage = Messages.getMessage(sequenceNo);
       if (lastSentMessage == null) {
         viewContext.logger().warn(NAME, "Was going to resent a message but the message is not found.");
         CentralEvents.fireLostMessage(sequenceNo);

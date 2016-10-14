@@ -1,5 +1,6 @@
 package com.middlerim.server.storage.persistent;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -13,7 +14,7 @@ import org.slf4j.LoggerFactory;
 import com.middlerim.server.Config;
 
 // (!) The instance is NOT thread-safe.
-class Segments<L extends Persistent> {
+class Segments<L extends Persistent> implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(Segments.class);
 
@@ -24,6 +25,7 @@ class Segments<L extends Persistent> {
   private final ByteBuffer deletedItem;
 
   Segments(StorageInformation<L> info) {
+    BackgroundService.closeOnShutdown(this);
     this.info = info;
     if (Config.TEST) {
       this.segmentSize = 160 - (160 % info.recordSize());
@@ -66,7 +68,6 @@ class Segments<L extends Persistent> {
       f.setLength(segmentSize);
       fc = f.getChannel();
       fcs[chIndex] = fc;
-      BackgroundService.closeOnShutdown(fc);
     } else if (!fc.isOpen()) {
       fcs[chIndex] = null;
       return getChannel(id);
@@ -82,7 +83,7 @@ class Segments<L extends Persistent> {
       putItem.reset();
       layout.read(putItem);
       putItem.reset();
-      fc.position(offset).write(putItem);
+      fc.write(putItem, offset);
     } catch (IOException e) {
       LOG.error("Could not write to the file. Data: {}, FileChannel: {}", layout, fc, e);
     }
@@ -93,13 +94,14 @@ class Segments<L extends Persistent> {
     long offset = getOffset(id);
     try {
       deletedItem.reset();
-      fc.position(offset).write(deletedItem);
+      fc.write(deletedItem, offset);
     } catch (IOException e) {
       LOG.error("Could not write a delete record row to the file. Id: {}, FileChannel: {}", id, fc, e);
     }
   }
 
-  void close() {
+  @Override
+  public void close() {
     for (FileChannel fc : fcs) {
       close(fc);
     }
@@ -109,7 +111,9 @@ class Segments<L extends Persistent> {
     try {
       fc.force(true);
     } catch (IOException e) {
-      LOG.error("Could not force flash the storage. It might have lost some data. FileChannel: {}", fc, e);
+      // Do not use logger otherwise deadlock or something unexpected things will be happened.
+      System.err.println("Could not force flash the storage. It might have lost some data. FileChannel: " + fc);
+      e.printStackTrace(System.err);
     }
     try {
       fc.close();
@@ -118,7 +122,9 @@ class Segments<L extends Persistent> {
         try {
           fc.close();
         } catch (IOException e1) {
-          LOG.error("Could not close the storage. It might have lost some data. FileChannel: {}", fc, e);
+          // Do not use logger otherwise deadlock or something unexpected things will be happened.
+          LOG.error("Could not close the storage. It might have lost some data. FileChannel: " + fc);
+          e1.printStackTrace(System.err);
         }
       }
     }

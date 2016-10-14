@@ -1,9 +1,8 @@
 package com.middlerim.client.message;
 
 import com.middlerim.client.CentralServer;
-import com.middlerim.message.ControlMessage;
-import com.middlerim.message.Inbound;
 import com.middlerim.message.Outbound;
+import com.middlerim.message.SequentialMessage;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
 
@@ -22,7 +21,7 @@ public final class Markers {
   public static final Exit EXIT = new Exit();
   public static final AssignAID ASSIGN_AID = new AssignAID();
 
-  private static final class Received implements Outbound, ControlMessage {
+  private static final class Received implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
 
     private Received() {
@@ -41,7 +40,7 @@ public final class Markers {
     }
   }
 
-  private static final class InvalidSequence implements Outbound, ControlMessage {
+  private static final class InvalidSequence implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
 
     private InvalidSequence() {
@@ -60,7 +59,7 @@ public final class Markers {
     }
   }
 
-  private static final class InvalidData implements Outbound, ControlMessage {
+  private static final class InvalidData implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
 
     private InvalidData() {
@@ -79,7 +78,7 @@ public final class Markers {
     }
   }
 
-  public static final class Exit implements Outbound, ControlMessage {
+  public static final class Exit implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
 
     private Exit() {
@@ -98,21 +97,10 @@ public final class Markers {
     }
   }
 
-  private static final class AssignAID implements Inbound, Outbound, ControlMessage {
-
+  private static final class AssignAID implements Outbound, SequentialMessage {
     private static final int FIXED_BYTE_SIZE = 1;
-    private static boolean called = false;
-    private AssignAID() {
-    }
 
-    @Override
-    public void processInput(ChannelHandlerContext ctx) {
-      // 
-      if (called) {
-        throw new IllegalStateException("Assign Anonymous ID response must be called only once.");
-      }
-      called = true;
-      CentralServer.postCreateServer(ctx.channel());
+    private AssignAID() {
     }
 
     @Override

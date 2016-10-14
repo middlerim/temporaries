@@ -1,15 +1,16 @@
 package com.middlerim.server.storage.persistent;
 
+import java.io.Closeable;
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.nio.file.StandardOpenOption;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class IdStorage {
+public class IdStorage implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(IdStorage.class);
 
   private final IdStorageInformation info;
@@ -17,6 +18,7 @@ public class IdStorage {
   private final ByteBuffer buf;
 
   public IdStorage(IdStorageInformation info) {
+    BackgroundService.closeOnShutdown(this);
     this.info = info;
     if (info.minValue() < 0) {
       throw new IllegalArgumentException("minValue must be greater than or equal to 0. minValue: " + info.minValue());
@@ -30,9 +32,7 @@ public class IdStorage {
       throw new RuntimeException("Could not open or create file. path: " + info.path(), e);
     }
     this.buf = ByteBuffer.allocate(Long.BYTES);
-    this.buf.position(0);
-    this.buf.mark();
-    BackgroundService.closeOnShutdown(fc);
+    this.buf.limit(Long.BYTES);
   }
 
   private FileChannel getChannel() throws IOException {
@@ -40,15 +40,12 @@ public class IdStorage {
     if (!dir.exists()) {
       dir.mkdirs();
     }
-    FileChannel fc = null;
     File path = new File(dir, "data");
-    @SuppressWarnings("resource")
-    RandomAccessFile f = new RandomAccessFile(path, "rw");
-    fc = f.getChannel();
-    f.setLength(Long.BYTES);
+    FileChannel fc = FileChannel.open(path.toPath(), StandardOpenOption.CREATE, StandardOpenOption.DSYNC, StandardOpenOption.READ, StandardOpenOption.WRITE);
     return fc;
   }
 
+  @Override
   public void close() {
     if (fc != null) {
       close(fc);
@@ -59,7 +56,9 @@ public class IdStorage {
     try {
       fc.force(true);
     } catch (IOException e) {
-      LOG.error("Could not force flash the storage. It might have lost some data. FileChannel: {}", fc, e);
+      // Do not use logger otherwise deadlock or something unexpected things will be happened.
+      System.err.println("Could not force flash the storage. It might have lost some data. FileChannel: " + fc);
+      e.printStackTrace(System.err);
     }
     try {
       fc.close();
@@ -68,15 +67,17 @@ public class IdStorage {
         try {
           fc.close();
         } catch (IOException e1) {
-          LOG.error("Could not close the storage. It might have lost some data. FileChannel: {}", fc, e);
+          // Do not use logger otherwise deadlock or something unexpected things will be happened.
+          LOG.error("Could not close the storage. It might have lost some data. FileChannel: " + fc);
+          e1.printStackTrace(System.err);
         }
       }
     }
   }
 
   public synchronized long incrementAndGet() throws IOException {
-    buf.reset();
-    fc.position(0).read(buf);
+    buf.position(0);
+    fc.read(buf, 0);
     long id;
     if (buf.position() != 0) {
       id = buf.getLong(0);
@@ -88,9 +89,8 @@ public class IdStorage {
     } else {
       ++id;
     }
-    buf.putLong(0, id);
+    buf.putLong(0, id).position(0);
+    fc.write(buf, 0);
     return id;
   }
-  
-  
 }

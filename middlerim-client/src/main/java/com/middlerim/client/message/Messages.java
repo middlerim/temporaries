@@ -9,11 +9,11 @@ public final class Messages {
 
   private static Map<Short, OutboundMessage<? extends Outbound>> lastSentMessage = new HashMap<>();
 
-  static OutboundMessage<? extends Outbound> removeSentMessage(short sequenceNo) {
+  static OutboundMessage<? extends Outbound> removeMessage(short sequenceNo) {
     return lastSentMessage.remove(sequenceNo);
   }
 
-  public static OutboundMessage<? extends Outbound> getSentMessage(short sequenceNo) {
+  public static OutboundMessage<? extends Outbound> getMessage(short sequenceNo) {
     return lastSentMessage.get(sequenceNo);
   }
 
