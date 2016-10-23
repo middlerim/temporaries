@@ -1,6 +1,6 @@
 package com.middlerim.server.storage.persistent;
 
-public class FixedLayoutPersistentStorage<L extends Persistent> {
+public class FixedLayoutPersistentStorage<L extends Persistent<L>> {
   private BackgroundService<L> backgroundService;
   private Segments<L> segments;
 
@@ -16,6 +16,10 @@ public class FixedLayoutPersistentStorage<L extends Persistent> {
 
   public void put(L layout) {
     backgroundService.put(layout);
+  }
+
+  public L get(Long id, L layout) {
+    return backgroundService.get(id, layout);
   }
 
   public void delete(Long id) {

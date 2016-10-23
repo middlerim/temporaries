@@ -6,7 +6,7 @@ public final class Bytes {
   private Bytes() {
   }
 
-  public static long bytesToInt(byte[] bytes) {
+  public static int bytesToInt(byte[] bytes) {
     return ByteBuffer.wrap(bytes).getInt();
   }
 
@@ -18,6 +18,11 @@ public final class Bytes {
 
   public static long bytesToLong(byte[] bytes) {
     return ByteBuffer.wrap(bytes).getLong();
+  }
+
+  public static long intToLong(byte[] bytes) {
+    byte[] bs = new byte[] {0, 0, 0, 0, bytes[0], bytes[1], bytes[2], bytes[3]};
+    return ByteBuffer.wrap(bs).getLong();
   }
 
   public static byte[] doubleToBytes(double value) {

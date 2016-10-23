@@ -18,16 +18,16 @@ public final class Markers {
   public static final InvalidData NOTFOUND = new InvalidData();
   public static final AssignAID ASSIGN_AID = new AssignAID();
 
-  private static final class Received implements Outbound {
+  private static class Received implements Outbound {
 
-    private static final int FIXED_BYTE_SIZE = 3;
+    private static final int FIXED_BYTE_SIZE = 2;
 
     private Received() {
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.RECEIVED).writeShort(recipient.sessionId.sequenceNo()), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.RECEIVED).writeByte(recipient.sessionId.clientSequenceNo()), recipient.address));
     }
 
     @Override
@@ -38,14 +38,14 @@ public final class Markers {
 
   private static final class InvalidSequence implements Outbound {
 
-    private static final int FIXED_BYTE_SIZE = 3;
+    private static final int FIXED_BYTE_SIZE = 2;
 
     private InvalidSequence() {
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeShort(recipient.sessionId.sequenceNo()), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeByte(recipient.sessionId.clientSequenceNo()), recipient.address));
     }
 
     @Override
@@ -56,14 +56,14 @@ public final class Markers {
 
   private static final class InvalidData implements Outbound {
 
-    private static final int FIXED_BYTE_SIZE = 3;
+    private static final int FIXED_BYTE_SIZE = 2;
 
     private InvalidData() {
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeShort(recipient.sessionId.sequenceNo()), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeByte(recipient.sessionId.clientSequenceNo()), recipient.address));
     }
 
     @Override

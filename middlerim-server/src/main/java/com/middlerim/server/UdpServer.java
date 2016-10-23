@@ -1,16 +1,28 @@
 package com.middlerim.server;
 
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.middlerim.server.channel.InboundHandler;
 import com.middlerim.server.channel.OutboundHandler;
 import com.middlerim.server.channel.PacketToInboundDecoder;
 import com.middlerim.server.channel.ServerMessageSizeEstimator;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.AdaptiveRecvByteBufAllocator;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.epoll.EpollDatagramChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -18,50 +30,83 @@ import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 
 public class UdpServer {
+  private static final Logger LOG = LoggerFactory.getLogger(UdpServer.class);
+  private static final ChannelHandler[] sharedHandlers = new ChannelHandler[]{new PacketToInboundDecoder(), new InboundHandler(), new OutboundHandler()};
+  private static List<ChannelFuture> closeFutures;
+  private static EventLoopGroup eventGroup;
+  private static ExecutorService embeddedServerService;
 
-  private final int port;
-
-  public UdpServer(int port) {
-    this.port = port;
+  private final InetSocketAddress v4;
+  private final InetSocketAddress v6;
+  private final int maximumPacketSize;
+  public UdpServer(int portV4, int portV6, int maximumPacketSize) {
+    this.v4 = new InetSocketAddress("192.168.101.6", portV4);
+    this.v6 = new InetSocketAddress("0:0:0:0:0:0:0:1", portV6);
+    this.maximumPacketSize = maximumPacketSize;
   }
 
-  public void run() throws Exception {
-    final EventLoopGroup eventGroup = createEventLoopGroup();
+  public void run() {
     try {
-      Bootstrap b = new Bootstrap();
-      b.group(eventGroup)
-          .channel(getChannelClass())
-          .handler(new ChannelInitializer<DatagramChannel>() {
-            @Override
-            public void initChannel(final DatagramChannel ch) throws Exception {
-              ch.pipeline().addLast(new PacketToInboundDecoder(), new InboundHandler(), new OutboundHandler());
-            }
-            @Override
-            public boolean isSharable() {
-              return true;
-            }
-          });
-      b.option(ChannelOption.SO_REUSEADDR, true);
-      b.option(ChannelOption.SO_SNDBUF, 30);
-      b.option(ChannelOption.SO_RCVBUF, 30);
-      b.option(ChannelOption.MESSAGE_SIZE_ESTIMATOR, new ServerMessageSizeEstimator());
-      b.option(ChannelOption.RCVBUF_ALLOCATOR, new AdaptiveRecvByteBufAllocator(25, 25, 512));
-
-      ChannelFuture f = b.bind(port).sync();
-      f.channel().closeFuture().sync();
+      run0();
+      for (ChannelFuture f : closeFutures) {
+        f.sync();
+      }
+    } catch (Exception e) {
+      e.printStackTrace();
     } finally {
-      eventGroup.shutdownGracefully();
+      shutdown();
     }
   }
 
-  public static void main(String[] args) throws Exception {
-    int port;
-    if (args.length > 0) {
-      port = Integer.parseInt(args[0]);
-    } else {
-      port = 1231;
+  private ChannelFuture run0() {
+    eventGroup = createEventLoopGroup();
+    Bootstrap b = new Bootstrap();
+    b.group(eventGroup)
+        .channel(getChannelClass())
+        .handler(new ChannelInitializer<DatagramChannel>() {
+          @Override
+          public void initChannel(final DatagramChannel ch) throws Exception {
+            ch.pipeline().addLast(sharedHandlers);
+          }
+          @Override
+          public boolean isSharable() {
+            return true;
+          }
+        });
+    b.option(ChannelOption.SO_REUSEADDR, true);
+    b.option(ChannelOption.SO_SNDBUF, maximumPacketSize * 1000);
+    b.option(ChannelOption.SO_RCVBUF, maximumPacketSize * 1000);
+    b.option(ChannelOption.MESSAGE_SIZE_ESTIMATOR, new ServerMessageSizeEstimator());
+    b.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(maximumPacketSize));
+
+    closeFutures = new ArrayList<>(2);
+    ChannelFuture bindFuture = b.bind(v4);
+    closeFutures.add(bindFuture.channel().closeFuture());
+    closeFutures.add(b.bind(v6).channel().closeFuture());
+    return bindFuture;
+  }
+
+  public static void main(String[] args) {
+    new UdpServer(1231, 1232, 1280).run();
+  }
+
+  public static void runEmbedded() {
+    CountDownLatch latch = new CountDownLatch(1);
+    new UdpServer(1231, 1232, 1280).run0().addListener(new ChannelFutureListener() {
+      @Override
+      public void operationComplete(ChannelFuture future) throws Exception {
+        if (future.cause() != null) {
+          future.cause().printStackTrace();
+        }
+        latch.countDown();
+      }
+    });
+    try {
+      latch.await(3, TimeUnit.SECONDS);
+    } catch (Exception e) {
+      e.printStackTrace();
+      shutdown();
     }
-    new UdpServer(port).run();
   }
 
   private EventLoopGroup createEventLoopGroup() {
@@ -71,5 +116,29 @@ public class UdpServer {
     return Config.isUnix
         ? EpollDatagramChannel.class
         : NioDatagramChannel.class;
+  }
+
+  public static void shutdown() {
+    if (closeFutures == null) {
+      return;
+    }
+    for (ChannelFuture f : closeFutures) {
+      try {
+        if (f.channel().isOpen()) {
+          f.channel().close();
+        }
+      } catch (Exception e) {
+        LOG.error("Could not shutdown the server(1/2)", e);
+      } finally {
+        try {
+          eventGroup.shutdownGracefully(0, 3, TimeUnit.SECONDS);
+        } catch (Exception e) {
+          LOG.error("Could not shutdown the server(2/2)", e);
+        }
+      }
+    }
+    if (embeddedServerService != null) {
+      embeddedServerService.shutdownNow();
+    }
   }
 }

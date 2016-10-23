@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory;
 import com.middlerim.server.Config;
 
 // (!) The instance is NOT thread-safe.
-class Segments<L extends Persistent> implements Closeable {
+class Segments<L extends Persistent<L>> implements Closeable {
 
   private static final Logger LOG = LoggerFactory.getLogger(Segments.class);
 
@@ -22,6 +22,7 @@ class Segments<L extends Persistent> implements Closeable {
   private final long segmentSize;
   private final FileChannel[] fcs;
   private final ByteBuffer putItem;
+  private final ByteBuffer getItem;
   private final ByteBuffer deletedItem;
 
   Segments(StorageInformation<L> info) {
@@ -40,6 +41,11 @@ class Segments<L extends Persistent> implements Closeable {
     this.putItem = ByteBuffer.allocate(info.recordSize());
     this.putItem.position(0);
     this.putItem.mark();
+
+    this.getItem = ByteBuffer.allocate(info.recordSize());
+    this.getItem.position(0);
+    this.getItem.mark();
+
     byte[] deletedBs = new byte[info.recordSize()];
     Arrays.fill(deletedBs, (byte) 0b0);
     this.deletedItem = ByteBuffer.allocate(info.recordSize()).put(deletedBs);
@@ -55,29 +61,36 @@ class Segments<L extends Persistent> implements Closeable {
     return (info.recordSize() * id) % segmentSize;
   }
 
-  private FileChannel getChannel(long id) throws IOException {
+  private FileChannel getChannel(long id, boolean createIfNot) throws IOException {
     int chIndex = channelIndex(id);
     FileChannel fc = fcs[chIndex];
     if (fc == null) {
       File dir = info.path().toFile();
       if (!dir.exists()) {
+        if (!createIfNot) {
+          return null;
+        }
         dir.mkdirs();
       }
+      File file = new File(dir, "seg" + chIndex);
+      if (!createIfNot && !file.exists()) {
+        return null;
+      }
       @SuppressWarnings("resource")
-      RandomAccessFile f = new RandomAccessFile(new File(dir, "seg" + chIndex), "rw");
+      RandomAccessFile f = new RandomAccessFile(file, "rw");
       f.setLength(segmentSize);
       fc = f.getChannel();
       fcs[chIndex] = fc;
     } else if (!fc.isOpen()) {
       fcs[chIndex] = null;
-      return getChannel(id);
+      return getChannel(id, createIfNot);
     }
     return fc;
   }
 
   void put(L layout) throws IOException {
     long id = layout.id();
-    FileChannel fc = getChannel(id);
+    FileChannel fc = getChannel(id, true);
     long offset = getOffset(id);
     try {
       putItem.reset();
@@ -89,8 +102,26 @@ class Segments<L extends Persistent> implements Closeable {
     }
   }
 
+  L get(long id, L layout) throws IOException {
+    FileChannel fc = getChannel(id, false);
+    if (fc == null) {
+      return null;
+    }
+    long offset = getOffset(id);
+    synchronized (getItem) {
+      getItem.reset();
+      fc.read(getItem, offset);
+      getItem.reset();
+      if (getItem.remaining() <= 0) {
+        return null;
+      }
+      layout.write(getItem);
+    }
+    return layout;
+  }
+
   void delete(long id) throws IOException {
-    FileChannel fc = getChannel(id);
+    FileChannel fc = getChannel(id, true);
     long offset = getOffset(id);
     try {
       deletedItem.reset();
@@ -108,6 +139,9 @@ class Segments<L extends Persistent> implements Closeable {
   }
 
   private void close(FileChannel fc) {
+    if (fc == null || !fc.isOpen()) {
+      return;
+    }
     try {
       fc.force(true);
     } catch (IOException e) {

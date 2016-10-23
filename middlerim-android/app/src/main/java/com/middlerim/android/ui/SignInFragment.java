@@ -17,19 +17,18 @@ import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 
 public class SignInFragment extends Fragment implements GoogleApiClient.OnConnectionFailedListener, View.OnClickListener {
-    private static final String TAG = Middlerim.NAME + ".SIGNIN";
-
+    private static final String TAG = Middlerim.TAG + ".SIGNIN";
     private GoogleApiClient mGoogleApiClient;
 
     public static boolean open(Middlerim activity) {
-        SignInFragment fragment = (SignInFragment) activity.getSupportFragmentManager().findFragmentByTag(SignInFragment.TAG);
+        SignInFragment fragment = (SignInFragment) activity.getSupportFragmentManager().findFragmentByTag(TAG);
         if (fragment == null) {
             fragment = new SignInFragment();
         } else if (fragment.isVisible()) {
             return false;
         }
         FragmentTransaction transaction = activity.getSupportFragmentManager().beginTransaction();
-        transaction.add(R.id.middlerim, fragment, SignInFragment.TAG);
+        transaction.add(fragment, TAG);
         transaction.addToBackStack(null);
         transaction.commit();
         return true;

@@ -6,19 +6,17 @@ import java.util.concurrent.TimeUnit;
 import com.middlerim.client.channel.ClientMessageSizeEstimator;
 import com.middlerim.client.channel.InboundHandler;
 import com.middlerim.client.channel.OutboundHandler;
+import com.middlerim.client.channel.OutboundSynchronizer;
 import com.middlerim.client.channel.PacketToInboundDecoder;
 import com.middlerim.client.message.Location;
 import com.middlerim.client.message.Markers;
-import com.middlerim.client.message.OutboundMessage;
 import com.middlerim.client.message.Text;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.client.view.ViewContext;
 import com.middlerim.client.view.ViewEvents;
-import com.middlerim.session.Session;
-import com.middlerim.session.SessionId;
+import com.middlerim.location.Point;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.channel.AdaptiveRecvByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -26,14 +24,14 @@ import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 
 public class CentralServer {
-  private static final String host = "192.168.101.10";
-  private static final int port = 1231;
-  public static final InetSocketAddress serverAddress = new InetSocketAddress(host, port);
+  public static final InetSocketAddress serverIPv4Address = new InetSocketAddress("192.168.101.6", 1231);
+  // public static final InetSocketAddress serverIPv6Address = new InetSocketAddress("0:0:0:0:0:0:0:1", 1232);
 
   private static ChannelHandler[] handlers;
   private static ChannelFuture closeFuture;
@@ -44,7 +42,11 @@ public class CentralServer {
   private static ViewEvents.Listener<ViewEvents.SubmitMessageEvent> submitMessageEventListener;
 
   private static void initializeChannelHandlers(ViewContext viewContext) {
-    handlers = new ChannelHandler[]{new PacketToInboundDecoder(viewContext), new InboundHandler(), new OutboundHandler()};
+    handlers = new ChannelHandler[]{
+        // In
+        new PacketToInboundDecoder(viewContext), new InboundHandler(),
+        // Out
+        new OutboundHandler(), new OutboundSynchronizer(viewContext)};
   }
 
   public static ChannelFuture run(ViewContext viewContext) {
@@ -52,29 +54,9 @@ public class CentralServer {
       shutdown();
     }
     initializeChannelHandlers(viewContext);
-    ChannelFuture bootFuture = createBootstrap().bind(0).addListener(new ChannelFutureListener() {
-      @Override
-      public void operationComplete(final ChannelFuture f) throws Exception {
-        if (!f.isSuccess()) {
-          CentralEvents.fireError("E_000", f.cause());
-          return;
-        }
-        if (Sessions.getSession() == null) {
-          Session anonymous = Session.create(SessionId.ANONYMOUS, serverAddress);
-          Sessions.setSession(anonymous);
-          f.channel().writeAndFlush(new OutboundMessage<>(anonymous, Markers.ASSIGN_AID));
-        }
-        initializeEventListeners(f.channel());
-        CentralEvents.fireStarted();
-      }
-    });
-    closeFuture = bootFuture.channel().closeFuture();
-    return closeFuture;
-  }
 
-  private static Bootstrap createBootstrap() {
     eventGroup = new NioEventLoopGroup(1);
-    final Bootstrap b = new Bootstrap();
+    Bootstrap b = new Bootstrap();
     b.group(eventGroup)
         .channel(NioDatagramChannel.class)
         .handler(new ChannelInitializer<DatagramChannel>() {
@@ -88,11 +70,28 @@ public class CentralServer {
           }
         });
     b.option(ChannelOption.SO_REUSEADDR, true);
-    b.option(ChannelOption.SO_SNDBUF, 30);
-    b.option(ChannelOption.SO_RCVBUF, 30);
+    b.option(ChannelOption.SO_SNDBUF, Config.MAX_PACKET_SIZE * 3);
+    b.option(ChannelOption.SO_RCVBUF, Config.MAX_PACKET_SIZE * 3);
     b.option(ChannelOption.MESSAGE_SIZE_ESTIMATOR, new ClientMessageSizeEstimator());
-    b.option(ChannelOption.RCVBUF_ALLOCATOR, new AdaptiveRecvByteBufAllocator(25, 25, 512));
-    return b;
+    b.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Config.MAX_PACKET_SIZE));
+
+    ChannelFuture bootFuture = b.bind(0).addListener(new ChannelFutureListener() {
+      @Override
+      public void operationComplete(final ChannelFuture f) throws Exception {
+        if (!f.isSuccess()) {
+          CentralEvents.fireError("E_000", f.cause());
+          return;
+        }
+        if (Sessions.getSession() == null) {
+          Sessions.setAnonymous();
+          f.channel().writeAndFlush(Markers.ASSIGN_AID);
+        }
+        initializeEventListeners(f.channel());
+        CentralEvents.fireStarted();
+      }
+    });
+    closeFuture = bootFuture.channel().closeFuture();
+    return bootFuture;
   }
 
   private static void initializeEventListeners(final Channel ch) {
@@ -102,13 +101,14 @@ public class CentralServer {
     destroyEventListener = new ViewEvents.Listener<ViewEvents.DestroyEvent>() {
       @Override
       public void handle(ViewEvents.DestroyEvent event) {
-        ch.writeAndFlush(new OutboundMessage<>(Sessions.getSession(), Markers.EXIT))
+        ch.writeAndFlush(Markers.EXIT)
             .addListener(new ChannelFutureListener() {
               @Override
               public void operationComplete(ChannelFuture f2) throws Exception {
                 if (!f2.isSuccess()) {
                   CentralEvents.fireError("E_001", f2.cause());
                 }
+                CentralServer.shutdown();
               }
             });
       }
@@ -119,9 +119,22 @@ public class CentralServer {
       ViewEvents.removeListener(locationUpdateEventListener);
     }
     locationUpdateEventListener = new ViewEvents.Listener<ViewEvents.LocationUpdateEvent>() {
+      private Point lastLocation;
+
+      private boolean isSameAsLastLocation(Point location) {
+        if (lastLocation == null) {
+          return false;
+        }
+        return lastLocation.distanceMeter(location) <= Config.ALLOWABLE_MARGIN_LOCATION_METER;
+      }
       @Override
       public void handle(ViewEvents.LocationUpdateEvent event) {
-        ch.writeAndFlush(new OutboundMessage<>(Sessions.getSession(), new Location(event.location)))
+        Point location = event.location.toPoint();
+        if (isSameAsLastLocation(location)) {
+          return;
+        }
+        lastLocation = location;
+        ch.writeAndFlush(new Location(location))
             .addListener(new ChannelFutureListener() {
               @Override
               public void operationComplete(ChannelFuture f2) throws Exception {
@@ -140,7 +153,7 @@ public class CentralServer {
     submitMessageEventListener = new ViewEvents.Listener<ViewEvents.SubmitMessageEvent>() {
       @Override
       public void handle(ViewEvents.SubmitMessageEvent event) {
-        ch.writeAndFlush(new OutboundMessage<>(Sessions.getSession(), new Text(event.message, event.messageCommand)))
+        ch.writeAndFlush(new Text.Out(event.displayName, event.messageCommand, event.message))
             .addListener(new ChannelFutureListener() {
               @Override
               public void operationComplete(ChannelFuture f2) throws Exception {
@@ -164,7 +177,7 @@ public class CentralServer {
       CentralEvents.fireError("E009", e);
     } finally {
       try {
-        eventGroup.shutdownGracefully(0, 1000, TimeUnit.SECONDS);
+        eventGroup.shutdownGracefully(0, 10, TimeUnit.SECONDS);
       } catch (Exception e) {
         CentralEvents.fireError("E009", e);
       }

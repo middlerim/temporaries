@@ -1,6 +1,6 @@
 package com.middlerim.client.channel;
 
-import com.middlerim.client.message.OutboundMessage;
+import com.middlerim.message.Outbound;
 
 import io.netty.channel.MessageSizeEstimator;
 import io.netty.channel.socket.DatagramPacket;
@@ -18,8 +18,8 @@ public class ClientMessageSizeEstimator implements MessageSizeEstimator {
 
     @Override
     public int size(Object msg) {
-      if (msg instanceof OutboundMessage) {
-        return ((OutboundMessage<?>) msg).message.byteSize();
+      if (msg instanceof Outbound) {
+        return ((Outbound) msg).byteSize();
       } else if (msg instanceof DatagramPacket) {
         return ((DatagramPacket) msg).content().writerIndex();
       }

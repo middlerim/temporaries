@@ -4,13 +4,15 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.middlerim.location.Point;
+import com.middlerim.location.Coordinate;
 
 public final class ViewEvents {
 
   private static final List<Listener<CreateEvent>> createListeners = new ArrayList<>(1);
   private static final List<Listener<LocationUpdateEvent>> locationUpdateListeners = new ArrayList<>(1);
   private static final List<Listener<SubmitMessageEvent>> submitMessageListeners = new ArrayList<>(1);
+  private static final List<Listener<ResumeEvent>> resumeListeners = new ArrayList<>(1);
+  private static final List<Listener<PauseEvent>> pauseListeners = new ArrayList<>(1);
   private static final List<Listener<DestroyEvent>> destroyListeners = new ArrayList<>(1);
   private static final List<Listener<StatusChangeEvent>> statusChangeListeners = new ArrayList<>(2);
 
@@ -18,6 +20,8 @@ public final class ViewEvents {
     createListeners.remove(listener);
     locationUpdateListeners.remove(listener);
     submitMessageListeners.remove(listener);
+    resumeListeners.remove(listener);
+    pauseListeners.remove(listener);
     destroyListeners.remove(listener);
     statusChangeListeners.remove(listener);
   }
@@ -41,6 +45,14 @@ public final class ViewEvents {
     addListener(listener, submitMessageListeners);
   }
 
+  public static void onResume(Listener<ResumeEvent> listener) {
+    addListener(listener, resumeListeners);
+  }
+
+  public static void onPause(Listener<PauseEvent> listener) {
+    addListener(listener, pauseListeners);
+  }
+
   public static void onDestroy(Listener<DestroyEvent> listener) {
     addListener(listener, destroyListeners);
   }
@@ -60,21 +72,29 @@ public final class ViewEvents {
   }
 
   public static class LocationUpdateEvent implements Event {
-    public final Point location;
+    public final Coordinate location;
 
-    private LocationUpdateEvent(Point location) {
+    private LocationUpdateEvent(Coordinate location) {
       this.location = location;
     }
   }
 
   public static class SubmitMessageEvent implements Event {
-    public final ByteBuffer message;
+    public final String displayName;
     public final byte messageCommand;
+    public final ByteBuffer message;
 
-    private SubmitMessageEvent(ByteBuffer message, byte messageCommand) {
-      this.message = message;
+    private SubmitMessageEvent(String displayName, byte messageCommand, ByteBuffer message) {
+      this.displayName = displayName;
       this.messageCommand = messageCommand;
+      this.message = message;
     }
+  }
+
+  public static class ResumeEvent implements Event {
+  }
+
+  public static class PauseEvent implements Event {
   }
 
   public static class DestroyEvent implements Event {
@@ -97,12 +117,20 @@ public final class ViewEvents {
     handleEvent(new CreateEvent(), createListeners);
   }
 
-  public static void fireLocationUpdate(Point location) {
+  public static void fireLocationUpdate(Coordinate location) {
     handleEvent(new LocationUpdateEvent(location), locationUpdateListeners);
   }
 
-  public static void fireSubmitMessage(ByteBuffer message, byte messageCommand) {
-    handleEvent(new SubmitMessageEvent(message, messageCommand), submitMessageListeners);
+  public static void fireSubmitMessage(String displayName, byte messageCommand, ByteBuffer message) {
+    handleEvent(new SubmitMessageEvent(displayName, messageCommand, message), submitMessageListeners);
+  }
+
+  public static void fireResume() {
+    handleEvent(new ResumeEvent(), resumeListeners);
+  }
+
+  public static void firePause() {
+    handleEvent(new PauseEvent(), pauseListeners);
   }
 
   public static void fireDestroy() {

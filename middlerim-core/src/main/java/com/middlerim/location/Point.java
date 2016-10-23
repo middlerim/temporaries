@@ -7,13 +7,17 @@ public class Point implements Comparable<Point> {
   public final int latitude;
   public final int longitude;
 
-  public static Point convert(double latitude, double longtitude) {
-    return new Point((int) (latitude * GETA), (int) (longtitude * GETA));
+  public static Point convert(double latitude, double longitude) {
+    return new Point((int) (latitude * GETA), (int) (longitude * GETA));
   }
 
-  public Point(int latitude, int longtitude) {
+  public Coordinate toCoordinate() {
+    return new Coordinate(latitude / GETA, longitude / GETA);
+  }
+
+  public Point(int latitude, int longitude) {
     this.latitude = latitude;
-    this.longitude = longtitude;
+    this.longitude = longitude;
   }
 
   public static double radians(int deg) {
@@ -35,7 +39,7 @@ public class Point implements Comparable<Point> {
 
   @Override
   public String toString() {
-    return "(" + latitude + ", " + longitude + ")";
+    return "(" + (latitude / GETA) + ", " + (longitude / GETA) + ")";
   }
 
   @Override

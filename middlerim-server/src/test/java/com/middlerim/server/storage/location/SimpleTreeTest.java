@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.util.List;
 
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.middlerim.location.Point;
@@ -18,6 +19,7 @@ import com.middlerim.util.Bytes;
 
 import io.netty.channel.unix.DatagramSocketAddress;
 
+@Ignore
 public class SimpleTreeTest {
 
   private SimpleTree tree = new SimpleTree();

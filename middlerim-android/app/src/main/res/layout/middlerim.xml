@@ -1,22 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/middlerim"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent">
 
     <fragment
-        android:id="@+id/message"
-        android:name="com.middlerim.android.ui.MessageFragment"
-        android:layout_width="match_parent"
-        android:layout_height="fill_parent" />
-
-    <fragment
-        android:id="@+id/map"
+        android:id="@+id/fragment_map"
         android:name="com.middlerim.android.ui.MapFragment"
         android:layout_width="match_parent"
-        android:layout_height="fill_parent" />
+        android:layout_height="match_parent" />
+
+    <fragment
+        android:id="@+id/fragment_stream"
+        android:name="com.middlerim.android.ui.StreamFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <fragment
+        android:id="@+id/fragment_main"
+        android:name="com.middlerim.android.ui.MainFragment"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
 
 </RelativeLayout>

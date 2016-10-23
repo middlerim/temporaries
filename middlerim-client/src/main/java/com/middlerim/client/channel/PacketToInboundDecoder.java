@@ -11,18 +11,17 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.middlerim.client.CentralEvents;
-import com.middlerim.client.CentralServer;
-import com.middlerim.client.Config;
 import com.middlerim.client.message.Markers;
-import com.middlerim.client.message.Messages;
-import com.middlerim.client.message.OutboundMessage;
+import com.middlerim.client.message.MessageLost;
 import com.middlerim.client.message.Text;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.client.view.ViewContext;
+import com.middlerim.location.Point;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.token.TokenIssuer;
+import com.middlerim.util.Bytes;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
@@ -49,66 +48,73 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (header == Headers.ASSIGN_AID) {
       if (!Sessions.getSession().isNotAssigned()) {
         // Already assigned. It happens because it's not synchronizing while ASSIGN_AID is being requested.
+        if (viewContext.isDebug()) {
+          viewContext.logger().debug(NAME, "Packet[ASSGIN_AID]: Ignored since annonymous ID has been assinged already.");
+        }
         return;
       }
       byte[] tokenBytes = new byte[8];
       in.readBytes(tokenBytes);
       SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
-      Sessions.setSession(Session.create(sessionId, CentralServer.serverAddress));
-      viewContext.logger().debug(NAME, "Received new anonymous session ID.");
+      Sessions.setSession(Session.create(sessionId, Sessions.getSession().address));
+      if (viewContext.isDebug()) {
+        viewContext.logger().debug(NAME, "Packet[ASSGIN_AID]: Received new anonymous session ID." + sessionId);
+      }
       CentralEvents.fireReceived(SessionId.UNASSIGNED_SEQUENCE_NO);
       return;
     }
-    Session session = Sessions.getSession();
-    short sequenceNo = in.readShort();
 
-    viewContext.logger().debug(NAME, "New packet: " + session + ":" + sequenceNo);
+    Session session = Sessions.getSession();
+    if (session == null || !session.address.equals(msg.sender())) {
+      // sender address must be same to prevent malicious packet.
+      viewContext.logger().warn(NAME, "Access from unknown address: " + msg.sender() + ", current session is " + session);
+      return;
+    }
 
     if (header == Headers.AGAIN) {
-      OutboundMessage<?> lastSentMessage = Messages.getMessage(sequenceNo);
-      if (lastSentMessage == null) {
-        viewContext.logger().warn(NAME, "Was going to resent a message but the message is not found.");
-        CentralEvents.fireLostMessage(sequenceNo);
-        return;
+      // Synchronize sequenceNo on the client with central server.
+      byte clientSequenceNo = in.readByte();
+      if (viewContext.isDebug()) {
+        viewContext.logger().debug(NAME, "Packet[AGAIN]:  clientSequenceNo on central server=" + clientSequenceNo + ", on the client=" + session.sessionId.clientSequenceNo());
       }
-      if (session.sessionId.sequenceNo() != sequenceNo) {
-        viewContext.logger().warn(NAME, "Was going to resent a message but the sessionId.sequenceNo is invalid status.");
-        CentralEvents.fireLostMessage(sequenceNo);
-        return;
-      }
-      if (session.sessionId.retry() < Config.MAX_RETRY) {
-        viewContext.logger().warn(NAME, "Was going to resent a message but it has been retried " + Config.MAX_RETRY + " times.");
-        CentralEvents.fireLostMessage(sequenceNo);
-        return;
-      }
-      if (!lastSentMessage.recipient.address.getHostString().equals(msg.sender().getHostString())) {
-        viewContext.logger().warn(NAME, "Was requested re-seinding message request but denied it since it's from different server."
-            + lastSentMessage.recipient.address.getHostString() + ", " + msg.sender().getHostString());
-        CentralEvents.fireLostMessage(sequenceNo);
-        return;
-      }
-      // Re-send the message.
-      ctx.channel().writeAndFlush(lastSentMessage);
+      session.sessionId.synchronizeClientWithServer(clientSequenceNo);
+      out.add(Markers.AGAIN);
       return;
     }
-    // sender address must be reset AFTER AGAIN logic.
-    session.address = msg.sender();
 
-    if (header == Headers.RECEIVED) {
-      CentralEvents.fireReceived(sequenceNo);
+    if (Headers.isMasked(header, Headers.RECEIVED)) {
+      byte clientSequenceNo = in.readByte();
+      if (viewContext.isDebug()) {
+        viewContext.logger().debug(NAME, "Packet[RECEIVED]: " + clientSequenceNo);
+      }
+      CentralEvents.fireReceived(clientSequenceNo);
+      if (Headers.isMasked(header, Headers.TEXT)) {
+        int numberOfDelivery = in.readInt();
+        if (viewContext.isDebug()) {
+          viewContext.logger().debug(NAME, "Packet[RECEIVED&TEXT]: " + numberOfDelivery);
+        }
+        CentralEvents.fireReceivedText(clientSequenceNo, numberOfDelivery);
+      }
       return;
     }
-    if (!session.sessionId.validateSequenceNoAndRefresh(sequenceNo)) {
-      // SequenceNo must be sequential.
-      ctx.channel().write(new OutboundMessage<>(session, Markers.INVALID_SEQUENCE));
-      return;
+    short serverSequenceNo = in.readShort();
+    if (!session.sessionId.validateServerSequenceNoAndRefresh(serverSequenceNo)) {
+      // Messages from server can be asynchronous. However, some messages are lost and will be requested.
+      if (viewContext.isDebug()) {
+        viewContext.logger().warn(NAME, "Invalid sequenceNo: " + (short) (session.sessionId.serverSequenceNo() + 1) + " != " + serverSequenceNo);
+      }
+      ctx.channel().write(new MessageLost(session.sessionId.serverSequenceNo(), serverSequenceNo));
     }
-    ctx.channel().writeAndFlush(new OutboundMessage<>(Sessions.getSession(), Markers.RECEIVED));
+    ctx.channel().writeAndFlush(Markers.RECEIVED);
 
     if (Headers.isMasked(header, Headers.FRAGMENT)) {
       int paylaadSize = in.readInt();
       int offset = in.readInt();
+      if (viewContext.isDebug()) {
+        viewContext.logger().debug(NAME, "Packet[FRAGMENT]: " + offset + "/" + paylaadSize);
+      }
       consumePayload(session, paylaadSize, offset, in);
+      return;
     }
     if (!Headers.isMasked(header, Headers.COMPLETE)) {
       // Wait for completion of consuming all payload.
@@ -118,8 +124,20 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
         buff = in.nioBuffer(in.readerIndex(), in.readableBytes());
       }
       if (Headers.isMasked(header, Headers.TEXT)) {
+        byte[] userIdBytes = new byte[4];
+        buff.get(userIdBytes);
+        int latitude = buff.getInt();
+        int longtitude = buff.getInt();
+        byte displayNameLength = buff.get();
         byte messageCommand = buff.get();
-        out.add(new Text(buff, messageCommand));
+        if (buff.remaining() <= displayNameLength) {
+          viewContext.logger().warn(NAME, "Received insufficient data. data length need at least " + displayNameLength + " but actually it's " + buff.remaining());
+          return;
+        }
+        if (viewContext.isDebug()) {
+          viewContext.logger().debug(NAME, "Packet[TEXT]: " + buff);
+        }
+        out.add(new Text.In(Bytes.intToLong(userIdBytes), new Point(latitude, longtitude).toCoordinate(), displayNameLength, messageCommand, buff.slice()));
       }
     }
   }
@@ -142,7 +160,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
 
   @Override
   public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-    ctx.channel().writeAndFlush(new OutboundMessage<>(Sessions.getSession(), Markers.INVALID_DATA));
+    ctx.channel().writeAndFlush(Markers.INVALID_DATA);
     // Ignore BufferUnderFlowException since length of the packet isn't validated deliberately in advance.
     if (viewContext.isDebug() || !(cause instanceof BufferUnderflowException || (cause.getCause() != null && cause.getCause() instanceof BufferUnderflowException))) {
       cause.printStackTrace();

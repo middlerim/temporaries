@@ -7,17 +7,17 @@ import android.support.v7.preference.PreferenceFragmentCompat;
 import android.view.MenuItem;
 
 public class GeneralPreferenceFragment extends PreferenceFragmentCompat {
-    public static final String TAG = GeneralPreferenceFragment.class.getName();
+    public static final String TAG = Middlerim.TAG + ".PREF";
 
     public static boolean open(Middlerim activity) {
-        GeneralPreferenceFragment fragment = (GeneralPreferenceFragment) activity.getSupportFragmentManager().findFragmentByTag(GeneralPreferenceFragment.TAG);
+        GeneralPreferenceFragment fragment = (GeneralPreferenceFragment) activity.getSupportFragmentManager().findFragmentByTag(TAG);
         if (fragment == null) {
             fragment = new GeneralPreferenceFragment();
         } else if (fragment.isVisible()) {
             return false;
         }
         FragmentTransaction transaction = activity.getSupportFragmentManager().beginTransaction();
-        transaction.add(R.id.middlerim, fragment, GeneralPreferenceFragment.TAG);
+        transaction.add(fragment, TAG);
         transaction.addToBackStack(null);
         transaction.commit();
         return true;

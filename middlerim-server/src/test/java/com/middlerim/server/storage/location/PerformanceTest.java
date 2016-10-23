@@ -14,7 +14,7 @@ import com.middlerim.session.Session;
 
 public class PerformanceTest {
 
-  private static final int SIZE = 10_000_000;
+  private static final int SIZE = 1_000;
   private static final byte AREA = MessageCommands.areaKM(16);
 
   // SIZE = 10_000_000

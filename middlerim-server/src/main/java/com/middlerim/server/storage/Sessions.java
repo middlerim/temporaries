@@ -27,9 +27,7 @@ public final class Sessions {
   private static List<SessionListener> listeners = new ArrayList<>();
 
   public static Session getSession(SessionId sessionId) {
-    synchronized (sessionMap) {
-      return sessionMap.get(sessionId);
-    }
+    return sessionMap.get(sessionId);
   }
 
   private static SessionId createAnonymousSessionId() throws IOException {

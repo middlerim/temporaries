@@ -1,30 +1,42 @@
 package com.middlerim.android.ui;
 
 import android.content.Context;
-import android.location.Location;
+import android.content.SharedPreferences;
+import android.support.v4.app.FragmentActivity;
 
 import com.middlerim.client.view.Logger;
 import com.middlerim.client.view.ViewContext;
 
 import java.io.File;
 
-public class AndroidContext extends ViewContext {
+class AndroidContext extends ViewContext {
 
     private static final Logger logger = new AndroidLogger();
-    private static Location lastKnownLocation;
 
     private Context ctx;
 
+    private AndroidContext() {
+    }
+
     public static AndroidContext get(Context appContext) {
-        AndroidContext instance = new AndroidContext();
-        instance.ctx = appContext;
-        return instance;
+        synchronized (AndroidContext.class) {
+            AndroidContext instance = new AndroidContext();
+            instance.ctx = appContext;
+            return instance;
+        }
     }
 
     public Context getContext() {
         return ctx;
     }
 
+
+    public FragmentManager fragmentManager() {
+        if (ctx instanceof FragmentActivity) {
+            return new FragmentManager((FragmentActivity) ctx);
+        }
+        throw new IllegalStateException("The context don't have fragmentManager" + ctx);
+    }
 
     @Override
     public File getCacheDir() {
@@ -36,16 +48,12 @@ public class AndroidContext extends ViewContext {
         return logger;
     }
 
+    public SharedPreferences preferences() {
+        return ctx.getSharedPreferences(Middlerim.TAG, Context.MODE_PRIVATE);
+    }
+
     @Override
     public boolean isDebug() {
         return true;
-    }
-
-    public void setLastKnownLocation(Location lastKnownLocation) {
-        this.lastKnownLocation = lastKnownLocation;
-    }
-
-    public Location getLastKnownLocation() {
-        return this.lastKnownLocation;
     }
 }

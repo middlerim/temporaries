@@ -1,6 +1,6 @@
 <resources>
 
-    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+    <style name="AppTheme" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="android:actionMenuTextColor">@color/white</item>
         <item name="preferenceTheme">@style/PreferencesTheme</item>
     </style>
@@ -10,4 +10,8 @@
         <item name="android:background">@color/optional</item>
     </style>
 
+    <style name="EditTextTheme" parent="android:Widget.EditText">
+        <item name="android:textColor">@color/textActive</item>
+        <item name="android:background">#00000000</item>
+    </style>
 </resources>

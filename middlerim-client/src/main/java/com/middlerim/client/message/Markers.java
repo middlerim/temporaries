@@ -1,6 +1,6 @@
 package com.middlerim.client.message;
 
-import com.middlerim.client.CentralServer;
+import com.middlerim.message.Inbound;
 import com.middlerim.message.Outbound;
 import com.middlerim.message.SequentialMessage;
 import com.middlerim.server.Headers;
@@ -14,12 +14,32 @@ public final class Markers {
   private Markers() {
   }
 
+  public static final Again AGAIN = new Again();
   public static final Received RECEIVED = new Received();
-  public static final InvalidSequence INVALID_SEQUENCE = new InvalidSequence();
   public static final InvalidData INVALID_DATA = new InvalidData();
-  public static final InvalidData NOTFOUND = new InvalidData();
   public static final Exit EXIT = new Exit();
   public static final AssignAID ASSIGN_AID = new AssignAID();
+
+  private static final class Again implements Inbound, Outbound {
+
+    private Again() {
+    }
+
+    @Override
+    public void processInput(ChannelHandlerContext ctx) {
+      ctx.channel().write(this);
+    }
+
+    @Override
+    public int byteSize() {
+      return 0;
+    }
+
+    @Override
+    public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
+      throw new UnsupportedOperationException("Don't call it. This is just a marker.");
+    }
+  }
 
   private static final class Received implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
@@ -40,25 +60,6 @@ public final class Markers {
     }
   }
 
-  private static final class InvalidSequence implements Outbound {
-    private static final int FIXED_BYTE_SIZE = 9;
-
-    private InvalidSequence() {
-    }
-
-    @Override
-    public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      byte[] sessionId = new byte[8];
-      recipient.sessionId.readBytes(sessionId);
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeBytes(sessionId), recipient.address));
-    }
-
-    @Override
-    public int byteSize() {
-      return FIXED_BYTE_SIZE;
-    }
-  }
-
   private static final class InvalidData implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
 
@@ -69,7 +70,7 @@ public final class Markers {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       byte[] sessionId = new byte[8];
       recipient.sessionId.readBytes(sessionId);
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeBytes(sessionId), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ERROR).writeBytes(sessionId), recipient.address));
     }
 
     @Override
@@ -78,7 +79,7 @@ public final class Markers {
     }
   }
 
-  public static final class Exit implements Outbound {
+  private static final class Exit implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
 
     private Exit() {
@@ -88,7 +89,7 @@ public final class Markers {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session session) {
       byte[] sessionId = new byte[8];
       session.sessionId.readBytes(sessionId);
-      return ctx.write(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.EXIT).writeBytes(sessionId), CentralServer.serverAddress));
+      return ctx.write(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.EXIT).writeBytes(sessionId), session.address));
     }
 
     @Override
@@ -97,7 +98,7 @@ public final class Markers {
     }
   }
 
-  private static final class AssignAID implements Outbound, SequentialMessage {
+  static final class AssignAID implements Outbound, SequentialMessage {
     private static final int FIXED_BYTE_SIZE = 1;
 
     private AssignAID() {

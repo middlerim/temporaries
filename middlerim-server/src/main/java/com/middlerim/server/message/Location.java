@@ -2,9 +2,6 @@ package com.middlerim.server.message;
 
 import java.nio.ByteBuffer;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.middlerim.location.Point;
 import com.middlerim.message.Inbound;
 import com.middlerim.server.channel.AttributeKeys;
@@ -15,13 +12,20 @@ import com.middlerim.session.SessionId;
 
 import io.netty.channel.ChannelHandlerContext;
 
-public class Location implements Inbound, Persistent {
-  private static final Logger logger = LoggerFactory.getLogger(Location.class);
-
-  public static final int SERIALIZED_BYTE_SIZE = Short.BYTES + Integer.BYTES * 2;
+public class Location implements Inbound, Persistent<Location> {
+  public static final int SERIALIZED_BYTE_SIZE = Byte.BYTES + Integer.BYTES * 2;
 
   private SessionId sessionId;
-  public final Point point;
+  public Point point;
+
+  public static Location createEmpty(SessionId sessionId) {
+    Location location = new Location();
+    location.sessionId = sessionId;
+    return location;
+  }
+
+  private Location() {
+  }
 
   public Location(Point point) {
     this.point = point;
@@ -32,9 +36,6 @@ public class Location implements Inbound, Persistent {
     Session session = ctx.channel().attr(AttributeKeys.SESSION).get();
     sessionId = session.sessionId;
     Locations.updateLocation(session, this);
-    if (logger.isDebugEnabled()) {
-      logger.debug("Updated location: " + session + point);
-    }
   }
 
   @Override
@@ -44,9 +45,15 @@ public class Location implements Inbound, Persistent {
 
   @Override
   public void read(ByteBuffer buf) {
-    buf.putShort(sessionId.sequenceNo())
+    buf.put(sessionId.clientSequenceNo())
         .putInt(point.latitude)
         .putInt(point.longitude);
+  }
+
+  @Override
+  public void write(ByteBuffer buf) {
+    buf.position(1);
+    point = new Point(buf.getInt(), buf.getInt());
   }
 
   @Override

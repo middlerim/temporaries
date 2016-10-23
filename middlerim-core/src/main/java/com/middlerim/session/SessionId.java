@@ -8,52 +8,58 @@ public final class SessionId {
   byte status = 0;
 
   public static final long UNASSIGNED_USERID = 0;
-  public static final short UNASSIGNED_SEQUENCE_NO = 1;
-  public static final long MAX_USER_SIZE = 42_949_672_95l;
+  public static final byte UNASSIGNED_SEQUENCE_NO = 1;
+  public static final long MAX_USER_SIZE = 4_294_967_295L;
   public static final long ANONYMOUS_USER_FROM = MAX_USER_SIZE - 2_000_000_000;
   public static final long ANONYMOUS_USER_TO = MAX_USER_SIZE;
 
-  private final long userId; // 0 < MAX_USER_SIZE
+  private final int userId; // 0 < MAX_USER_SIZE
   private final int hashCode;
-  private short sequenceNo; // Short.MIN < Short.MAX
-  private short retryCount;
+  private byte clientSequenceNo; // Byte.MIN < Byte.MAX
+  private short serverSequenceNo; // Short.MIN < Short.MAX
 
   public SessionId(long id) {
-    this.userId = id;
-    this.hashCode = (int) (userId ^ (userId >>> 32));
-    this.retryCount = 0;
+    this.userId = (int) id;
+    this.hashCode = userId ^ (userId >>> 16);
+
+    // Assign random sequence no at first to prevent invalid access.
     while (true) {
-      // Assign random sequence no at first to prevent invalid access.
-      this.sequenceNo = (short) (Math.random() * Short.MAX_VALUE);
-      if (this.sequenceNo != SessionId.UNASSIGNED_SEQUENCE_NO) {
+      this.clientSequenceNo = (byte) (Math.random() * Byte.MAX_VALUE);
+      if (this.clientSequenceNo != SessionId.UNASSIGNED_SEQUENCE_NO) {
+        break;
+      }
+    }
+    while (true) {
+      this.serverSequenceNo = (short) (Math.random() * Short.MAX_VALUE);
+      if (this.serverSequenceNo != SessionId.UNASSIGNED_SEQUENCE_NO) {
         break;
       }
     }
   }
 
   public SessionId(byte[] n) {
-    this.userId = (((long) n[0] & 0xff) << 24) |
+    this.userId = (int) ((((long) n[0] & 0xff) << 24) |
         (((long) n[1] & 0xff) << 16) |
         (((long) n[2] & 0xff) << 8) |
-        (((long) n[3] & 0xff));
+        (((long) n[3] & 0xff)));
     this.hashCode = (int) (userId ^ (userId >>> 32));
     // n[4] is reserved.
-    this.retryCount = (short) n[5];
-    this.sequenceNo = (short) ((n[6] << 8) | (n[7] & 0xff));
+    this.clientSequenceNo = n[5];
+    this.serverSequenceNo = (short) ((n[6] << 8) | (n[7] & 0xff));
   }
 
-  public boolean validateSequenceNoAndRefresh(short sequenceNo) {
-    if (this == ANONYMOUS || status == NEW || this.sequenceNo + 1 == sequenceNo) {
-      this.sequenceNo = sequenceNo;
+  public boolean validateServerSequenceNoAndRefresh(short sequenceNo) {
+    if (this == ANONYMOUS || status == NEW || (short) (this.serverSequenceNo + 1) == sequenceNo) {
+      this.serverSequenceNo = sequenceNo;
       status = DEFAULT;
       return true;
     }
     return false;
   }
 
-  public boolean validateAndRefresh(SessionId sessionId) {
-    if (this == ANONYMOUS || userId == sessionId.userId && (status == NEW || (short) (this.sequenceNo + 1) == sessionId.sequenceNo)) {
-      this.sequenceNo = sessionId.sequenceNo;
+  public boolean validateClientAndRefresh(SessionId sessionId) {
+    if (this == ANONYMOUS || userId == sessionId.userId && (status == NEW || (byte) (this.clientSequenceNo + 1) == sessionId.clientSequenceNo)) {
+      this.clientSequenceNo = sessionId.clientSequenceNo;
       status = DEFAULT;
       return true;
     }
@@ -61,11 +67,29 @@ public final class SessionId {
   }
 
   public long userId() {
+    if (userId < 0) {
+      return MAX_USER_SIZE + userId + 1;
+    }
     return userId;
   }
 
-  public short sequenceNo() {
-    return sequenceNo;
+  public short serverSequenceNo() {
+    return serverSequenceNo;
+  }
+
+  public byte clientSequenceNo() {
+    return clientSequenceNo;
+  }
+
+  public void synchronizeClientWithServer(byte newSequenceNo) {
+    clientSequenceNo = newSequenceNo;
+  }
+
+  public void readUserIdBytes(byte[] bytes) {
+    bytes[0] = (byte) (userId >>> 24);
+    bytes[1] = (byte) (userId >>> 16);
+    bytes[2] = (byte) (userId >>> 8);
+    bytes[3] = (byte) userId;
   }
 
   public void readBytes(byte[] bytes) {
@@ -74,27 +98,26 @@ public final class SessionId {
     bytes[2] = (byte) (userId >>> 8);
     bytes[3] = (byte) userId;
     bytes[4] = 0;
-    bytes[5] = 0;
-    bytes[6] = (byte) (sequenceNo >>> 8);
-    bytes[7] = (byte) sequenceNo;
+    bytes[5] = clientSequenceNo;
+    bytes[6] = (byte) (serverSequenceNo >>> 8);
+    bytes[7] = (byte) serverSequenceNo;
   }
 
-  public void incrementSequenceNo() {
-    retryCount = 0;
-    sequenceNo++;
+  public void incrementClientSequenceNo() {
+    clientSequenceNo++;
     status = DEFAULT;
   }
 
-  public short retry() {
-    sequenceNo--;
-    return ++retryCount;
+  public void incrementServerSequenceNo() {
+    serverSequenceNo++;
+    status = DEFAULT;
   }
 
-  public SessionId copyWithNewSequenceNo(short sequenceNo) {
+  public SessionId copyWithNewServerSequenceNo(short sequenceNo) {
     byte[] bytes = new byte[8];
     readBytes(bytes);
     SessionId copied = new SessionId(bytes);
-    copied.sequenceNo = sequenceNo;
+    copied.serverSequenceNo = sequenceNo;
     return copied;
   }
 
@@ -110,6 +133,6 @@ public final class SessionId {
 
   @Override
   public String toString() {
-    return userId + "#" + sequenceNo;
+    return userId + "#" + serverSequenceNo + "#" + clientSequenceNo;
   }
 }

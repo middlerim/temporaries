@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/fragment_area_selector"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent">
+
+    <com.middlerim.android.ui.AreaSelector
+        android:id="@+id/area_selector"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentEnd="true"
+        android:layout_marginBottom="48dp"
+        android:layout_marginEnd="24dp"
+        android:layout_marginTop="96dp"
+        android:max="50"
+        android:progressDrawable="@drawable/area_selector_progress"
+        android:thumb="@drawable/area_selector_control" />
+</RelativeLayout>

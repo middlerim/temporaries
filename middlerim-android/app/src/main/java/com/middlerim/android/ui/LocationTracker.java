@@ -8,24 +8,29 @@ import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
-import android.util.Log;
 
 import com.middlerim.client.view.ViewEvents;
-import com.middlerim.location.Point;
+import com.middlerim.location.Coordinate;
 
 public class LocationTracker {
-    private static final String TAG = "BOOMBOOMTESTGPS";
-    private static final int LOCATION_INTERVAL = 5000;
-    private static final float LOCATION_DISTANCE = 200f;
+    private static final String TAG = Middlerim.TAG + ".LOCTRAC";
+
+    private static final int LOCATION_INTERVAL_FG = 5000;
+    private static final float LOCATION_DISTANCE_FG = 200f;
+
+    private static final int LOCATION_INTERVAL_BG = LOCATION_INTERVAL_FG * 20;
+    private static final float LOCATION_DISTANCE_BG = LOCATION_DISTANCE_FG * 2;
 
     private LocationManager locationManager;
     private AndroidContext ctx;
+    private boolean isForeground;
+    private boolean isStarted;
 
     private class LocationListener implements android.location.LocationListener {
 
         @Override
         public void onLocationChanged(Location location) {
-            ViewEvents.fireLocationUpdate(Point.convert(location.getLatitude(), location.getLongitude()));
+            ViewEvents.fireLocationUpdate(new Coordinate(location.getLatitude(), location.getLongitude()));
         }
 
         @Override
@@ -49,47 +54,55 @@ public class LocationTracker {
 
     private final LocationListener locationListener = new LocationListener();
 
-    public void start(final AndroidContext ctx) {
-        this.ctx = ctx;
+    public void switchTrackingMode(boolean isForeground) {
+        if (!(isForeground ^ this.isForeground)) {
+            return;
+        }
+        this.isForeground = isForeground;
+        stop();
+        initLocationManager();
+    }
 
+    public void start(final AndroidContext ctx, final boolean isForeground) {
+        if (isStarted) {
+            return;
+        }
+        isStarted = true;
+        this.ctx = ctx;
+        this.isForeground = isForeground;
+        initLocationManager();
+    }
+
+    private void initLocationManager() {
+        if (!checkPermission()) {
+            return;
+        }
         new Handler(ctx.getContext().getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
-                if (locationManager == null) {
-                    locationManager = (LocationManager) ctx.getContext().getSystemService(Context.LOCATION_SERVICE);
-                }
-                try {
-                    locationManager.requestLocationUpdates(
-                            LocationManager.NETWORK_PROVIDER, LOCATION_INTERVAL, LOCATION_DISTANCE,
-                            locationListener);
-                } catch (java.lang.SecurityException ex) {
-                    Log.i(TAG, "fail to request location update, ignore", ex);
-                } catch (IllegalArgumentException ex) {
-                    Log.d(TAG, "network provider does not exist, " + ex.getMessage());
-                }
-                try {
-                    locationManager.requestLocationUpdates(
-                            LocationManager.GPS_PROVIDER, LOCATION_INTERVAL, LOCATION_DISTANCE,
-                            locationListener);
-                } catch (java.lang.SecurityException ex) {
-                    Log.i(TAG, "fail to request location update, ignore", ex);
-                } catch (IllegalArgumentException ex) {
-                    Log.d(TAG, "gps provider does not exist " + ex.getMessage());
-                }
-
                 if (!checkPermission()) {
                     return;
+                }
+                if (locationManager == null) {
+                    locationManager = (LocationManager) ctx.getContext().getSystemService(Context.LOCATION_SERVICE);
                 }
                 Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                 if (lastKnownLocation == null) {
                     lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER);
                 }
-                ctx.setLastKnownLocation(lastKnownLocation);
+                if (lastKnownLocation != null) {
+                    ViewEvents.fireLocationUpdate(new Coordinate(lastKnownLocation.getLatitude(), lastKnownLocation.getLongitude()));
+                }
+                int locationInterval = isForeground ? LOCATION_INTERVAL_FG : LOCATION_INTERVAL_BG;
+                float locationDistance = isForeground ? LOCATION_DISTANCE_FG : LOCATION_DISTANCE_BG;
+                locationManager.requestLocationUpdates(
+                        LocationManager.GPS_PROVIDER, locationInterval, locationDistance, locationListener);
             }
-        }, 1000);
+        }, 2000);
     }
 
     public void stop() {
+        isStarted = false;
         if (!checkPermission()) {
             return;
         }
@@ -99,9 +112,6 @@ public class LocationTracker {
     }
 
     private boolean checkPermission() {
-        return ActivityCompat.checkSelfPermission(ctx.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(ctx.getContext(), Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(ctx.getContext(), Manifest.permission.ACCESS_NETWORK_STATE) == PackageManager.PERMISSION_GRANTED
-                && ActivityCompat.checkSelfPermission(ctx.getContext(), Manifest.permission.INTERNET) == PackageManager.PERMISSION_GRANTED;
+        return ActivityCompat.checkSelfPermission(ctx.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 }

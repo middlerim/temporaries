@@ -1,6 +1,6 @@
 package com.middlerim.client.channel;
 
-import com.middlerim.client.message.OutboundMessage;
+import com.middlerim.client.session.Sessions;
 import com.middlerim.message.Outbound;
 
 import io.netty.channel.ChannelFuture;
@@ -13,9 +13,8 @@ public class OutboundHandler extends ChannelOutboundHandlerAdapter {
 
   @Override
   public void write(ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
-    @SuppressWarnings("unchecked")
-    OutboundMessage<Outbound> outboundMessage = (OutboundMessage<Outbound>) msg;
-    outboundMessage.processOutput(ctx).addListener(new ChannelFutureListener() {
+    Outbound message = (Outbound) msg;
+    message.processOutput(ctx, Sessions.getSession()).addListener(new ChannelFutureListener() {
       @Override
       public void operationComplete(ChannelFuture future) throws Exception {
         if (future.isSuccess()) {

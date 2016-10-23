@@ -1,6 +1,5 @@
 package com.middlerim.client.message;
 
-import com.middlerim.client.CentralServer;
 import com.middlerim.location.Point;
 import com.middlerim.message.Outbound;
 import com.middlerim.server.Headers;
@@ -12,7 +11,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 
 public final class Location implements Outbound {
-  private static final int FIXED_BYTE_SIZE = 25;
+  public static final int FIXED_BYTE_SIZE = 17;
   private final Point point;
 
   public Location(Point point) {
@@ -28,7 +27,7 @@ public final class Location implements Outbound {
         .writeBytes(sessionIdBytes)
         .writeInt(point.latitude)
         .writeInt(point.longitude);
-    return ctx.write(new DatagramPacket(buf, CentralServer.serverAddress));
+    return ctx.write(new DatagramPacket(buf, session.address));
   }
   @Override
   public String toString() {

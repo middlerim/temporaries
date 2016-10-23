@@ -31,31 +31,78 @@ public class SessionIdTest {
   }
 
   @Test
-  public void testIncrementAllSequenceNo() {
+  public void testIncrementAllClientSequenceNo() {
     byte[] bs = new byte[]{0, 0, 0, 0, 0, 0, 0, 0};
     SessionId server = new SessionId(bs);
     SessionId client = new SessionId(bs);
 
-    for (int i = 0, max = (Short.MAX_VALUE * 2) + 1; i < max; i++) {
-      client.incrementSequenceNo();
+    for (int i = 0, max = (Byte.MAX_VALUE * 2) + 1; i < max; i++) {
+      client.incrementClientSequenceNo();
       client.readBytes(bs);
       client = new SessionId(bs);
 
-      assertTrue(Arrays.toString(bs) + server.toString() + " - " + client.toString(), server.validateAndRefresh(client));
+      assertTrue(Arrays.toString(bs) + server.toString() + " - " + client.toString(), server.validateClientAndRefresh(client));
       server.readBytes(bs);
       server = new SessionId(bs);
     }
   }
 
   @Test
+  public void testIncrementAllServerSequenceNo() {
+    byte[] bs = new byte[]{0, 0, 0, 0, 0, 0, 0, 0};
+    SessionId server = new SessionId(bs);
+    SessionId client = new SessionId(bs);
+
+    for (int i = 0, max = (Short.MAX_VALUE * 2) + 1; i < max; i++) {
+      server.incrementServerSequenceNo();
+      server.readBytes(bs);
+      server = new SessionId(bs);
+
+      assertTrue(Arrays.toString(bs) + client.toString() + " - " + server.toString(), client.validateServerSequenceNoAndRefresh(server.serverSequenceNo()));
+      client.readBytes(bs);
+      client = new SessionId(bs);
+    }
+  }
+  
+  @Test
   public void testMaxUserId() {
     long userIdMax = 4294967295L;
     byte[] bs = new byte[]{-1, -1, -1, -1, 0, 0, 0, 0};
     SessionId sessionId = new SessionId(bs);
     assertThat(sessionId.userId(), is(userIdMax));
-
     byte[] bs2 = new byte[8];
     sessionId.readBytes(bs2);
     assertThat(bs, is(bs2));
+
+    sessionId = new SessionId(userIdMax);
+    assertThat(sessionId.userId(), is(userIdMax));
+  }
+
+  @Test
+  public void testMinUserId() {
+    long userIdMin = 0L;
+    byte[] bs = new byte[]{0, 0, 0, 0, 0, 0, 0, 0};
+    SessionId sessionId = new SessionId(bs);
+    assertThat(sessionId.userId(), is(userIdMin));
+    byte[] bs2 = new byte[8];
+    sessionId.readBytes(bs2);
+    assertThat(bs, is(bs2));
+
+    sessionId = new SessionId(userIdMin);
+    assertThat(sessionId.userId(), is(userIdMin));
+  }
+
+  @Test
+  public void testUser1() {
+    long userId = 1L;
+    byte[] bs = new byte[]{0, 0, 0, 1, 0, 0, 0, 0};
+    SessionId sessionId = new SessionId(bs);
+    assertThat(sessionId.userId(), is(userId));
+    byte[] bs2 = new byte[8];
+    sessionId.readBytes(bs2);
+    assertThat(bs, is(bs2));
+
+    sessionId = new SessionId(userId);
+    assertThat(sessionId.userId(), is(userId));
   }
 }

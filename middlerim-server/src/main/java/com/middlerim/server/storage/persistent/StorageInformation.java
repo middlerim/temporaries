@@ -5,7 +5,7 @@ import java.nio.file.Paths;
 
 import com.middlerim.server.Config;
 
-public class StorageInformation<L extends Persistent> {
+public class StorageInformation<L extends Persistent<L>> {
 
   private final String storageId;
   private final int recordSize;
@@ -29,7 +29,6 @@ public class StorageInformation<L extends Persistent> {
     return maxStorageSize;
   }
 
-  
   public Path path() {
     return Paths.get("./", Config.TEST ? "db_test" : "db", "s_" + storageId);
   }
