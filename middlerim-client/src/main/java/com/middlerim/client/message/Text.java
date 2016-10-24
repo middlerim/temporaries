@@ -46,12 +46,14 @@ public class Text {
 
   public static class Out implements Outbound, SequentialMessage {
 
+    public final int tag;
     public final String displayName;
     private final byte[] displayNameBytes;
     public final byte messageCommand;
     public final ByteBuffer messageBytes;
 
-    public Out(String displayName, byte messageCommand, ByteBuffer messageBytes) {
+    public Out(int tag,String displayName, byte messageCommand, ByteBuffer messageBytes) {
+      this.tag = tag;
       this.displayName = displayName;
       this.displayNameBytes = displayName.getBytes(Config.MESSAGE_ENCODING);
       if (displayNameBytes.length > 40) {
@@ -80,7 +82,7 @@ public class Text {
         @Override
         public void operationComplete(ChannelFuture future) throws Exception {
           messageBytes.position(0); // Reset position after finish it because ByteBuf might use the messageBytes in an other thread.
-          CentralEvents.fireSendMessage(sequenceNo, displayName, messageBytes);
+          CentralEvents.fireSendMessage(tag, sequenceNo, displayName, messageBytes);
         }
       });
       return cf;
@@ -89,6 +91,11 @@ public class Text {
     @Override
     public int byteSize() {
       return 11 + displayNameBytes.length + messageBytes.remaining();
+    }
+
+    @Override
+    public int tag() {
+      return tag;
     }
   }
 }

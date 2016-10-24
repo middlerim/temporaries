@@ -37,11 +37,11 @@ public class UdpServer {
   private static ExecutorService embeddedServerService;
 
   private final InetSocketAddress v4;
-  private final InetSocketAddress v6;
+  // private final InetSocketAddress v6;
   private final int maximumPacketSize;
-  public UdpServer(int portV4, int portV6, int maximumPacketSize) {
-    this.v4 = new InetSocketAddress("192.168.101.6", portV4);
-    this.v6 = new InetSocketAddress("0:0:0:0:0:0:0:1", portV6);
+  public UdpServer(String hostV4, int portV4, String hostV6, int portV6, int maximumPacketSize) {
+    this.v4 = new InetSocketAddress(hostV4, portV4);
+    // this.v6 = new InetSocketAddress(hostV6, portV6);
     this.maximumPacketSize = maximumPacketSize;
   }
 
@@ -82,17 +82,17 @@ public class UdpServer {
     closeFutures = new ArrayList<>(2);
     ChannelFuture bindFuture = b.bind(v4);
     closeFutures.add(bindFuture.channel().closeFuture());
-    closeFutures.add(b.bind(v6).channel().closeFuture());
+    // closeFutures.add(b.bind(v6).channel().closeFuture());
     return bindFuture;
   }
 
   public static void main(String[] args) {
-    new UdpServer(1231, 1232, 1280).run();
+    new UdpServer(Config.CENTRAL_SERVER_IPV4_HOST, Config.CENTRAL_SERVER_IPV4_PORT, Config.CENTRAL_SERVER_IPV6_HOST, Config.CENTRAL_SERVER_IPV6_PORT, 1280).run();
   }
 
   public static void runEmbedded() {
     CountDownLatch latch = new CountDownLatch(1);
-    new UdpServer(1231, 1232, 1280).run0().addListener(new ChannelFutureListener() {
+    new UdpServer(Config.CENTRAL_SERVER_IPV4_HOST, Config.CENTRAL_SERVER_IPV4_PORT, Config.CENTRAL_SERVER_IPV6_HOST, Config.CENTRAL_SERVER_IPV6_PORT, 1280).run0().addListener(new ChannelFutureListener() {
       @Override
       public void operationComplete(ChannelFuture future) throws Exception {
         if (future.cause() != null) {

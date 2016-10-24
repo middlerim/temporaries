@@ -28,10 +28,10 @@ import io.netty.channel.FixedRecvByteBufAllocator;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 public class CentralServer {
-  public static final InetSocketAddress serverIPv4Address = new InetSocketAddress("192.168.101.6", 1231);
-  // public static final InetSocketAddress serverIPv6Address = new InetSocketAddress("0:0:0:0:0:0:0:1", 1232);
+  public static final InetSocketAddress serverIPv4Address = new InetSocketAddress(Config.CENTRAL_SERVER_IPV4_HOST, Config.CENTRAL_SERVER_IPV4_PORT);
 
   private static ChannelHandler[] handlers;
   private static ChannelFuture closeFuture;
@@ -55,7 +55,7 @@ public class CentralServer {
     }
     initializeChannelHandlers(viewContext);
 
-    eventGroup = new NioEventLoopGroup(1);
+    eventGroup = new NioEventLoopGroup(1, new DefaultThreadFactory(Config.INTERNAL_APP_NAME + "background"));
     Bootstrap b = new Bootstrap();
     b.group(eventGroup)
         .channel(NioDatagramChannel.class)
@@ -96,7 +96,7 @@ public class CentralServer {
 
   private static void initializeEventListeners(final Channel ch) {
     if (destroyEventListener != null) {
-      ViewEvents.removeListener(destroyEventListener);
+      ViewEvents.removeListener("CentralServer.destroyEventListener");
     }
     destroyEventListener = new ViewEvents.Listener<ViewEvents.DestroyEvent>() {
       @Override
@@ -113,10 +113,10 @@ public class CentralServer {
             });
       }
     };
-    ViewEvents.onDestroy(destroyEventListener);
+    ViewEvents.onDestroy("CentralServer.destroyEventListener", destroyEventListener);
 
     if (locationUpdateEventListener != null) {
-      ViewEvents.removeListener(locationUpdateEventListener);
+      ViewEvents.removeListener("CentralServer.locationUpdateEventListener");
     }
     locationUpdateEventListener = new ViewEvents.Listener<ViewEvents.LocationUpdateEvent>() {
       private Point lastLocation;
@@ -145,15 +145,15 @@ public class CentralServer {
             });
       }
     };
-    ViewEvents.onLocationUpdate(locationUpdateEventListener);
+    ViewEvents.onLocationUpdate("CentralServer.locationUpdateEventListener", locationUpdateEventListener);
 
     if (submitMessageEventListener != null) {
-      ViewEvents.removeListener(submitMessageEventListener);
+      ViewEvents.removeListener("CentralServer.submitMessageEventListener");
     }
     submitMessageEventListener = new ViewEvents.Listener<ViewEvents.SubmitMessageEvent>() {
       @Override
       public void handle(ViewEvents.SubmitMessageEvent event) {
-        ch.writeAndFlush(new Text.Out(event.displayName, event.messageCommand, event.message))
+        ch.writeAndFlush(new Text.Out(event.tag, event.displayName, event.messageCommand, event.message))
             .addListener(new ChannelFutureListener() {
               @Override
               public void operationComplete(ChannelFuture f2) throws Exception {
@@ -164,7 +164,7 @@ public class CentralServer {
             });
       }
     };
-    ViewEvents.onSubmitMessage(submitMessageEventListener);
+    ViewEvents.onSubmitMessage("CentralServer.submitMessageEventListener", submitMessageEventListener);
   }
 
   public static void shutdown() {

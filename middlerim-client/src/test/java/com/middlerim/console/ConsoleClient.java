@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -48,6 +50,10 @@ public class ConsoleClient {
       System.out.println("  number of Delivery: " + msg.numberOfDelivery + ")");
       return msg;
     }
+    @Override
+    public Path storagePath() {
+      return Paths.get("./", "db_test");
+    }
   };
 
   private static MessagePool<Message> messagePool = new MessagePool<>(messagePoolAdaptor);
@@ -89,14 +95,14 @@ public class ConsoleClient {
   public static void main(String[] args) throws Exception {
     ConsoleContext c = new ConsoleContext();
     CentralServer.run(c);
-    CentralEvents.onError(new CentralEvents.Listener<CentralEvents.ErrorEvent>() {
+    CentralEvents.onError("ConsoleClient#main.CentralEvents.Listener<CentralEvents.ErrorEvent>", new CentralEvents.Listener<CentralEvents.ErrorEvent>() {
       @Override
       public void handle(CentralEvents.ErrorEvent event) {
         System.err.println(event.message);
         event.cause.printStackTrace(System.err);
       }
     });
-    CentralEvents.onReceived(new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
+    CentralEvents.onReceived("ConsoleClient#main.CentralEvents.Listener<CentralEvents.ReceivedEvent>", new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
       @Override
       public void handle(CentralEvents.ReceivedEvent event) {
         receivedMessageCount++;
@@ -105,7 +111,7 @@ public class ConsoleClient {
     messagePool.onRemoved(new MessagePool.RemovedListener<Message>() {
       @Override
       public void onRemoved(int i, Message message) {
-        System.out.println("Removed from local message buffer: " + message.userId + ", " + message.displayName + ", " + message.content);
+        // System.out.println("Removed from local message buffer: " + message.userId);
       }
     });
     ViewEvents.fireCreate();
@@ -116,17 +122,17 @@ public class ConsoleClient {
   private static void stressTest(final int limit) throws InterruptedException, ExecutionException, TimeoutException {
     long start = System.currentTimeMillis();
     final CountDownLatch c = new CountDownLatch(limit);
-    CentralEvents.onReceived(new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
+    CentralEvents.onReceived("ConsoleClient.CentralEvents.Listener<CentralEvents.ReceivedEvent>", new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
       @Override
       public void handle(CentralEvents.ReceivedEvent event) {
         c.countDown();
         if (c.getCount() > 0) {
           final ByteBuffer buf = ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()});
-          ViewEvents.fireSubmitMessage(displayName, MessageCommands.areaKM(10), buf);
+          ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), buf);
         }
       }
     });
-    ViewEvents.fireSubmitMessage(displayName, MessageCommands.areaKM(10), ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()}));
+    ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()}));
     boolean result = c.await(10, TimeUnit.SECONDS);
     System.out.println((System.currentTimeMillis() - start) + "ms" + "[" + result + "]");
     System.out.println("Received message count: " + receivedMessageCount);
@@ -158,7 +164,7 @@ public class ConsoleClient {
         ByteBuffer buf = ByteBuffer.allocate(messageBytes.length);
         buf.put(messageBytes).rewind();
         System.out.println("Sending text size: " + messageBytes.length + ", remaining: " + buf.remaining());
-        ViewEvents.fireSubmitMessage(displayName, MessageCommands.areaKM(10), buf);
+        ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), buf);
       } else if ("C".equals(s)) {
         System.out.println("Enter messages count >");
         String size = br.readLine();

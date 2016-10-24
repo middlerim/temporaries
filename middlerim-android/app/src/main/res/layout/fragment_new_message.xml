@@ -1,48 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/fragment_new_message"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#99000000"
     android:orientation="vertical">
 
-    <LinearLayout
-        android:id="@+id/new_message_header"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:paddingTop="15dp">
-
-        <View
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
-
-        <ImageButton
-            android:id="@+id/button_edit_area"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:layout_marginEnd="45dp"
-            android:background="#00000000"
-            android:src="@drawable/button_edit_area" />
-
-
-        <ImageButton
-            android:id="@+id/button_send_message"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end"
-            android:layout_marginEnd="15dp"
-            android:background="#00000000"
-            android:src="@drawable/button_send_message" />
-    </LinearLayout>
-
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_above="@+id/new_message_footer"
-        android:layout_below="@+id/new_message_header"
         android:scrollbars="vertical">
 
         <EditText
@@ -52,7 +18,7 @@
             android:layout_height="wrap_content"
             android:gravity="top"
             android:imeOptions="actionDone|flagNoFullscreen"
-            android:inputType="textMultiLine|textImeMultiLine"
+            android:inputType="textMultiLine|textImeMultiLine|textNoSuggestions"
             android:isScrollContainer="false"
             android:maxLength="1560"
             android:scrollbars="none">
@@ -74,5 +40,14 @@
             android:layout_height="0dp"
             android:layout_weight="1" />
 
+        <ImageButton
+            android:id="@+id/button_send_message"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="end"
+            android:layout_marginBottom="15dp"
+            android:layout_marginEnd="15dp"
+            android:background="#00000000"
+            android:src="@drawable/button_send_message" />
     </LinearLayout>
 </RelativeLayout>

@@ -1,4 +1,4 @@
-package com.middlerim.server.storage.persistent;
+package com.middlerim.storage.persistent;
 
 import java.nio.ByteBuffer;
 

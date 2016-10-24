@@ -9,11 +9,11 @@ import java.util.List;
 import java.util.Map;
 
 import com.middlerim.server.Config;
-import com.middlerim.server.storage.persistent.IdStorage;
-import com.middlerim.server.storage.persistent.IdStorageInformation;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.session.SessionListener;
+import com.middlerim.storage.persistent.IdStorage;
+import com.middlerim.storage.persistent.IdStorageInformation;
 
 public final class Sessions {
   private static LinkedList<Session> sessionQueue = new LinkedList<>();
@@ -32,13 +32,22 @@ public final class Sessions {
 
   private static SessionId createAnonymousSessionId() throws IOException {
     long id = aidStorage.incrementAndGet();
-    return new SessionId(id);
+    return new SessionId((int) id);
+  }
+
+  public static Session getOrCreateAnonymous(InetSocketAddress address) throws IOException {
+    Session anonymous = getOrCreateSession0(createAnonymousSessionId(), address);
+    return anonymous;
   }
 
   public static Session getOrCreateSession(SessionId sessionId, InetSocketAddress address) throws IOException {
     if (sessionId == SessionId.ANONYMOUS) {
-      sessionId = createAnonymousSessionId();
+      throw new IllegalArgumentException();
     }
+    return getOrCreateSession0(sessionId, address);
+  }
+
+  private static Session getOrCreateSession0(SessionId sessionId, InetSocketAddress address) throws IOException {
     synchronized (sessionMap) {
       Session session = sessionMap.get(sessionId);
       if (session == null) {

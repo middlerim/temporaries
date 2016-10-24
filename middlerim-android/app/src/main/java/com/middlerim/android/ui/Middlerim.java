@@ -1,15 +1,19 @@
 package com.middlerim.android.ui;
 
+import android.os.StrictMode;
+
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.util.SparseIntArray;
 import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.View;
 import android.widget.Toast;
 
 import com.middlerim.client.CentralEvents;
@@ -18,6 +22,17 @@ import com.middlerim.client.view.ViewEvents;
 public class Middlerim extends AppCompatActivity {
     public static final String TAG = "Middlerim";
 
+    private Toolbar toolbar;
+    private int originalToolbarHeight = -1;
+    private AndroidContext androidContext;
+    private SparseIntArray buttonQueueIds = new SparseIntArray(5);
+
+    {
+        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
+                .permitAll().build();
+        StrictMode.setThreadPolicy(policy);
+
+    }
     private CentralEvents.Listener<CentralEvents.ErrorEvent> errorEventListener = new CentralEvents.Listener<CentralEvents.ErrorEvent>() {
         @Override
         public void handle(CentralEvents.ErrorEvent event) {
@@ -36,10 +51,71 @@ public class Middlerim extends AppCompatActivity {
         }
     };
 
+
+    private CentralEvents.Listener<CentralEvents.SendMessageEvent> sendMessageListener = new CentralEvents.Listener<CentralEvents.SendMessageEvent>() {
+        @Override
+        public void handle(CentralEvents.SendMessageEvent event) {
+            buttonQueueIds.put(event.clientSequenceNo, event.tag);
+        }
+    };
+
+
+    private CentralEvents.Listener<CentralEvents.LostMessageEvent> lostMessageListener = new CentralEvents.Listener<CentralEvents.LostMessageEvent>() {
+        @Override
+        public void handle(final CentralEvents.LostMessageEvent event) {
+            final int tag = event.message.tag();
+            new Handler(getMainLooper()).post(new Runnable() {
+                @Override
+                public void run() {
+                    androidContext.buttonQueueManager().removeButton(tag);
+                    final Toast toast = Toast.makeText(Middlerim.this, R.string.error_lost_message, Toast.LENGTH_SHORT);
+                    toast.show();
+                }
+            });
+        }
+    };
+
+    private CentralEvents.Listener<CentralEvents.ReceivedTextEvent> receivedTextListener = new CentralEvents.Listener<CentralEvents.ReceivedTextEvent>() {
+        private byte lastReveicedSequenceNo = Byte.MIN_VALUE;
+
+        @Override
+        public void handle(CentralEvents.ReceivedTextEvent event) {
+            int tag = buttonQueueIds.get(event.clientSequenceNo, -1);
+            if (tag == -1) {
+                return;
+            }
+            buttonQueueIds.delete(event.clientSequenceNo);
+            androidContext.buttonQueueManager().removeButton(tag);
+            if ((lastReveicedSequenceNo + 1) != event.clientSequenceNo) {
+                // Despite clientSequenceNo must be sequencial, it isn't. Some messages might be lost.
+                for (int i = lastReveicedSequenceNo; i < event.clientSequenceNo; i++) {
+                    int leftOverTag = buttonQueueIds.get(i, -1);
+                    if (leftOverTag == -1) {
+                        continue;
+                    }
+                    buttonQueueIds.delete(i);
+                    androidContext.buttonQueueManager().removeButton(leftOverTag);
+                }
+                androidContext.logger().warn(TAG, "The message which sent just before the message which sent the time are not match. prev: "
+                        + lastReveicedSequenceNo + ", curr: " + event.clientSequenceNo);
+            }
+            lastReveicedSequenceNo = event.clientSequenceNo;
+        }
+    };
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.middlerim);
+        initToolbar();
+        androidContext = AndroidContext.get(this);
+        androidContext.fragmentManager().openWelcomeSet();
+    }
+
+    private void initToolbar() {
+        toolbar = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        setTitle("");
     }
 
     @Override
@@ -52,41 +128,25 @@ public class Middlerim extends AppCompatActivity {
     }
 
     private void resume() {
-        CentralEvents.onError(errorEventListener);
+        CentralEvents.onError(TAG + ".errorEventListener", errorEventListener);
+        CentralEvents.onLostMessage(TAG + ".lostMessageListener", lostMessageListener);
         BackgroundService.onResumeForground(this);
-        ViewEvents.onStatusChange(statusChangeEventListener);
+        ViewEvents.onStatusChange(TAG + ".statusChangeEventListener", statusChangeEventListener);
+        CentralEvents.onReceivedText(TAG + ".receivedTextListener", receivedTextListener);
+        CentralEvents.onSendMessage(TAG + ".sendMessageListener", sendMessageListener);
+        ViewEvents.fireResume();
     }
 
     @Override
     protected void onPause() {
-        ViewEvents.removeListener(statusChangeEventListener);
+        ViewEvents.firePause();
+        CentralEvents.removeListener(TAG + ".sendMessageListener");
+        CentralEvents.removeListener(TAG + ".receivedTextListener");
+        ViewEvents.removeListener(TAG + ".statusChangeEventListener");
         BackgroundService.onPauseForground(this);
-        CentralEvents.removeListener(errorEventListener);
+        CentralEvents.removeListener(TAG + ".lostMessageListener");
+        CentralEvents.removeListener(TAG + ".errorEventListener");
         super.onPause();
-    }
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        MenuInflater inflater = getMenuInflater();
-        inflater.inflate(R.menu.main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.action_settings:
-                GeneralPreferenceFragment.open(this);
-                return true;
-            case R.id.action_signIn:
-                SignInFragment.open(this);
-                return true;
-            case R.id.action_search:
-                System.out.println(item);
-                return true;
-            default:
-                return super.onOptionsItemSelected(item);
-        }
     }
 
     private void onError(final String message, Throwable e) {
@@ -143,14 +203,66 @@ public class Middlerim extends AppCompatActivity {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 // Don't call resume() here. It's going to be called by statusChangeEventListener.
                 return;
-            } else {
-                finish();
             }
+            finish();
         }
     }
 
     private void requestGps() {
         final GpsDisabledAlertDialogFragment alertDialog = new GpsDisabledAlertDialogFragment();
         alertDialog.show(getSupportFragmentManager(), TAG);
+    }
+
+    public void setToolbarHandler(View view) {
+        view.setOnTouchListener(new View.OnTouchListener() {
+            private boolean visible;
+            private float initialY = Float.MIN_VALUE;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_MOVE:
+                        if (initialY == Float.MIN_VALUE) {
+                            if (originalToolbarHeight <= 0) {
+                                originalToolbarHeight = toolbar.getHeight();
+                            }
+                            visible = toolbar.getVisibility() == View.VISIBLE;
+                            if (!visible) {
+                                toolbar.setVisibility(View.VISIBLE);
+                                initialY = event.getY();
+                            } else {
+                                initialY = event.getY() - originalToolbarHeight;
+                            }
+                        }
+                        int delta = (int) (event.getY() - initialY);
+                        if (delta <= originalToolbarHeight) {
+                            toolbar.setTop(delta - originalToolbarHeight);
+                            toolbar.setBottom(delta);
+                        } else if (delta >= originalToolbarHeight && toolbar.getTop() != 0) {
+                            toolbar.setTop(0);
+                            toolbar.setBottom(originalToolbarHeight);
+                        }
+                        break;
+                    case MotionEvent.ACTION_UP:
+                        delta = (int) (event.getY() - initialY);
+                        if (!visible && delta >= originalToolbarHeight / 2) {
+                            toolbar.setTop(0);
+                            toolbar.setBottom(originalToolbarHeight);
+                        } else if (visible && delta <= originalToolbarHeight / 2) {
+                            toolbar.setBottom(0);
+                            toolbar.setVisibility(View.INVISIBLE);
+                        } else if (visible) {
+                            toolbar.setTop(0);
+                            toolbar.setBottom(originalToolbarHeight);
+                        } else {
+                            toolbar.setBottom(0);
+                            toolbar.setVisibility(View.INVISIBLE);
+                        }
+                        initialY = Float.MIN_VALUE;
+                }
+                return false;
+            }
+        });
     }
 }

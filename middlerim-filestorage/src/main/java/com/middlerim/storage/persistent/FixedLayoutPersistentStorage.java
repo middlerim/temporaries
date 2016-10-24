@@ -1,4 +1,8 @@
-package com.middlerim.server.storage.persistent;
+package com.middlerim.storage.persistent;
+
+import com.middlerim.Config;
+
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 public class FixedLayoutPersistentStorage<L extends Persistent<L>> {
   private BackgroundService<L> backgroundService;
@@ -6,7 +10,7 @@ public class FixedLayoutPersistentStorage<L extends Persistent<L>> {
 
   public <I extends StorageInformation<L>> FixedLayoutPersistentStorage(I info) {
     this.segments = new Segments<>(info);
-    this.backgroundService = new BackgroundService<>(segments);
+    this.backgroundService = new BackgroundService<>(segments, new DefaultThreadFactory(Config.INTERNAL_APP_NAME + "-" + info.storageId()));
   }
 
   public void close() {

@@ -113,5 +113,10 @@ public final class Markers {
     public int byteSize() {
       return FIXED_BYTE_SIZE;
     }
+
+    @Override
+    public int tag() {
+      return -1;
+    }
   }
 }

@@ -14,6 +14,8 @@ class AndroidContext extends ViewContext {
     private static final Logger logger = new AndroidLogger();
 
     private Context ctx;
+    private ButtonQueueManager buttonQueueManager;
+    private FragmentManager fragmentManager;
 
     private AndroidContext() {
     }
@@ -30,10 +32,35 @@ class AndroidContext extends ViewContext {
         return ctx;
     }
 
+    public Middlerim getActivity() {
+        if (ctx instanceof Middlerim) {
+            return (Middlerim) ctx;
+        }
+        return null;
+    }
 
-    public FragmentManager fragmentManager() {
+    public synchronized FragmentManager fragmentManager() {
         if (ctx instanceof FragmentActivity) {
-            return new FragmentManager((FragmentActivity) ctx);
+            if (fragmentManager != null) {
+                return this.fragmentManager;
+            }
+            this.fragmentManager = new FragmentManager((FragmentActivity) ctx);
+            return this.fragmentManager;
+        }
+        throw new IllegalStateException("The context don't have fragmentManager" + ctx);
+    }
+
+    public synchronized ButtonQueueManager buttonQueueManager() {
+        if (ctx instanceof FragmentActivity) {
+            if (buttonQueueManager != null) {
+                return buttonQueueManager;
+            }
+            MainFragment main = fragmentManager().getMainFragment();
+            if (main == null) {
+                throw new IllegalStateException("MainFragment need to be started.");
+            }
+            buttonQueueManager = new ButtonQueueManager(main);
+            return buttonQueueManager;
         }
         throw new IllegalStateException("The context don't have fragmentManager" + ctx);
     }

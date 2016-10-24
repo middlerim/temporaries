@@ -3,17 +3,24 @@ package com.middlerim.client.view;
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import com.middlerim.client.CentralEvents;
 import com.middlerim.location.Coordinate;
 
 public class MessagePoolTest {
+
+  private static final Path tmpDir = Paths.get("./", "db_test");
 
   private static class Entry {
     long userId;
@@ -25,7 +32,16 @@ public class MessagePoolTest {
     @Override
     public boolean equals(Object obj) {
       Entry b = (Entry) obj;
-      return userId == b.userId && location.equals(b.location) && displayName.equals(b.displayName) && message.equals(b.message) && numberOfDelivery == b.numberOfDelivery;
+      return userId == b.userId
+          && location.equals(b.location)
+          && displayName.equals(b.displayName)
+          && message.equals(b.message)
+          && numberOfDelivery == b.numberOfDelivery;
+    }
+
+    @Override
+    public String toString() {
+      return "userId: " + userId + ", location: " + location + ", " + displayName;
     }
   }
 
@@ -40,6 +56,10 @@ public class MessagePoolTest {
       entry.numberOfDelivery = numberOfDelivery;
       return entry;
     }
+    @Override
+    public Path storagePath() {
+      return tmpDir;
+    }
   };
 
   private Random r = new Random();
@@ -53,6 +73,15 @@ public class MessagePoolTest {
     entry.numberOfDelivery = -1;
     CentralEvents.fireReceiveMessage(entry.userId, entry.location, entry.displayName, entry.message);
     return entry;
+  }
+
+  @Before
+  public void before() throws IOException {
+    File f = tmpDir.toFile();
+    for (String s : f.list()) {
+      File currentFile = new File(f.getPath(), s);
+      currentFile.delete();
+    }
   }
 
   @Test
@@ -110,6 +139,63 @@ public class MessagePoolTest {
       added.add(fireReceiveMessage());
       assertThat(lastRemovedIndex, is(i));
       assertThat(lastRemovedEntry, is(added.get(i)));
+    }
+  }
+
+  @Test
+  public void testReadOldMessage_samePool() throws InterruptedException {
+    int capacity = 2;
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    List<Entry> expects = new ArrayList<>();
+    for (int i = 0; i < capacity; i++) {
+      expects.add(fireReceiveMessage());
+    }
+
+    Thread.sleep(100);
+    pool.loadLatestMessages(2);
+    for (int i = 0; i < capacity; i++) {
+      Entry entry = pool.get(i + capacity);
+      assertThat(entry.userId, is(expects.get(i).userId));
+    }
+  }
+
+  @Test
+  public void testReadOldMessage_newPool_full() throws InterruptedException {
+    int capacity = 3;
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    List<Entry> expects = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      expects.add(fireReceiveMessage());
+    }
+
+    Thread.sleep(100);
+    int size = pool.size();
+    pool = new MessagePool<>(capacity, messagePoolAdapter);
+    pool.loadLatestMessages(size);
+    assertThat(pool.size(), is(3));
+    for (int i = 0; i < capacity; i++) {
+      Entry entry = pool.get(i);
+      assertThat(entry.userId, is(expects.get(i + 2).userId));
+    }
+  }
+
+  @Test
+  public void testReadOldMessage_newPool() throws InterruptedException {
+    int capacity = 3;
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    List<Entry> expects = new ArrayList<>();
+    for (int i = 0; i < 2; i++) {
+      expects.add(fireReceiveMessage());
+    }
+
+    Thread.sleep(100);
+    int size = pool.size();
+    pool = new MessagePool<>(capacity, messagePoolAdapter);
+    pool.loadLatestMessages(size);
+    assertThat(pool.size(), is(2));
+    for (int i = 0; i < 2; i++) {
+      Entry entry = pool.get(i);
+      assertThat("" + i, entry.userId, is(expects.get(i).userId));
     }
   }
 }

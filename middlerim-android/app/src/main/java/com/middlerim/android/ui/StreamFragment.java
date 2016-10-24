@@ -1,45 +1,61 @@
 package com.middlerim.android.ui;
 
 import android.content.Context;
+import android.content.res.Resources;
+import android.content.res.TypedArray;
+import android.graphics.Canvas;
+import android.graphics.Rect;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.SpannableStringBuilder;
-import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.middlerim.client.Config;
 import com.middlerim.client.view.MessagePool;
 import com.middlerim.location.Coordinate;
 
 import java.nio.ByteBuffer;
+import java.text.NumberFormat;
 
 public class StreamFragment extends Fragment {
-    private static final String TAG = Middlerim.TAG + "MSG";
-
+    public static final String TAG = Middlerim.TAG + ".Stream";
+    private static final int ACTIVE = -1;
+    private AndroidContext androidContext;
     private RecyclerView view;
     private MessagePool<Message> messagePool;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
+    private int pauseAt = ACTIVE;
 
-    public static class ViewHolder extends RecyclerView.ViewHolder {
-        public final View view;
-        public final TextView contentView;
-        public Message item;
+    private static class ViewHolder extends RecyclerView.ViewHolder {
+        final View view;
+        final TextView displayName;
+        final TextView message;
+        final TextView numberOfDelivery;
+        Message item;
 
         public ViewHolder(View view) {
             super(view);
             this.view = view;
-            this.contentView = (TextView) view.findViewById(R.id.message_details);
+            this.displayName = (TextView) view.findViewById(R.id.display_name);
+            this.message = (TextView) view.findViewById(R.id.message);
+            this.numberOfDelivery = (TextView) view.findViewById(R.id.number_delivery);
         }
 
         @Override
         public String toString() {
-            return super.toString() + " '" + contentView.getText() + "'";
+            return super.toString() + " '" + message.getText() + "'";
         }
     }
 
@@ -53,13 +69,15 @@ public class StreamFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(final ViewHolder holder, int position) {
-            Message msg = messagePool.get(position);
-            if (msg == null) {
-                Log.w(TAG, "Invalid index access. " + position);
-            }
+            Message msg = messagePool.getLatest(position % Math.min(messagePool.size(), messagePool.capacity()));
             holder.item = msg;
-            holder.contentView.setText(holder.item.message);
-
+            holder.displayName.setText(holder.item.displayName);
+            holder.message.setText(holder.item.message);
+            if (holder.item.numberOfDelivery != null) {
+                holder.numberOfDelivery.setText(holder.item.numberOfDelivery);
+            } else {
+                holder.numberOfDelivery.setVisibility(View.INVISIBLE);
+            }
             holder.view.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -70,67 +88,15 @@ public class StreamFragment extends Fragment {
 
         @Override
         public int getItemCount() {
-            return messagePool.size();
+            return messagePool.size() >= messagePool.capacity() ? Integer.MAX_VALUE : messagePool.size();
         }
     };
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        messagePool = new MessagePool<>(3, new MessagePool.Adapter<Message>() {
-            private int lastIndex;
-
-            @Override
-            public Message onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
-                byte[] bs = new byte[message.remaining()];
-                message.get(bs);
-                SpannableStringBuilder sb = new SpannableStringBuilder(new String(bs, Config.MESSAGE_ENCODING));
-                Message msg = new Message(userId, location, displayName, sb, numberOfDelivery);
-                viewAdapter.notifyItemInserted(messagePool.size());
-                view.smoothScrollToPosition(messagePool.size());
-                return msg;
-            }
-        });
-        messagePool.onRemoved(new MessagePool.RemovedListener<Message>() {
-            @Override
-            public void onRemoved(int index, Message message) {
-                viewAdapter.notifyItemRemoved(index);
-            }
-        });
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        messagePool.startListen();
-    }
-
-    @Override
-    public void onPause() {
-        messagePool.stopListen();
-        super.onPause();
-    }
-
-    public static class Message {
-        public final long userId;
-        public final Coordinate location;
-        public final String displayName;
-        public final CharSequence message;
-        public final int numberOfDelivery;
-
-        public Message(long userId, Coordinate location, String displayName, CharSequence message, int numberOfDelivery) {
-            this.userId = userId;
-            this.location = location;
-            this.displayName = displayName;
-            this.message = message;
-            this.numberOfDelivery = numberOfDelivery;
-        }
-
-        @Override
-        public String toString() {
-            return "user ID: " + userId + ", location: " + location + ", displayName: " + displayName + ", message: " + message + ", number of delivery: " + numberOfDelivery;
-        }
-
+        androidContext = AndroidContext.get(getActivity());
+        messagePool = new MessagePool<>(10, messagePoolAdapter);
     }
 
     @Override
@@ -141,6 +107,76 @@ public class StreamFragment extends Fragment {
         view.setLayoutManager(new LinearLayoutManager(context));
         view.setHasFixedSize(true);
         view.setAdapter(viewAdapter);
+        androidContext.getActivity().setToolbarHandler(view);
         return view;
+    }
+
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (hidden) {
+            pauseAt = messagePool.size();
+        } else {
+            int p = pauseAt;
+            pauseAt = ACTIVE;
+            if (p != ACTIVE && messagePool.size() > 0) {
+                Resources res = getResources();
+                String text = res.getString(R.string.info_unread_messages, messagePool.size() - p);
+                final Toast toast = Toast.makeText(getContext(), text, Toast.LENGTH_SHORT);
+                toast.show();
+            }
+        }
+    }
+
+    private void scrollTo(final int position) {
+        handler.post(new Runnable() {
+            @Override
+            public void run() {
+                viewAdapter.notifyItemInserted(position);
+                view.smoothScrollToPosition(position);
+            }
+        });
+    }
+
+    private final MessagePool.Adapter<Message> messagePoolAdapter = new MessagePool.Adapter<Message>() {
+        @Override
+        public Message onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
+            byte[] bs = new byte[message.remaining()];
+            message.get(bs);
+            SpannableStringBuilder sb = new SpannableStringBuilder(new String(bs, Config.MESSAGE_ENCODING));
+            Message msg = new Message(userId, location, displayName, sb, numberOfDelivery);
+
+            if (pauseAt == ACTIVE) {
+                scrollTo(messagePool.size());
+            }
+            return msg;
+        }
+    };
+
+    public static class Message {
+        private static NumberFormat numberFormat = NumberFormat.getIntegerInstance();
+
+        public final long userId;
+        public final Coordinate location;
+        public final String displayName;
+        public final CharSequence message;
+        public final String numberOfDelivery;
+
+        public Message(long userId, Coordinate location, String displayName, CharSequence message, int numberOfDelivery) {
+            this.userId = userId;
+            this.location = location;
+            this.displayName = displayName;
+            this.message = message;
+            if (numberOfDelivery >= 0) {
+                this.numberOfDelivery = numberFormat.format(numberOfDelivery);
+            } else {
+                this.numberOfDelivery = null;
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "user ID: " + userId + ", location: " + location + ", displayName: " + displayName + ", message: " + message + ", number of delivery: " + numberOfDelivery;
+        }
     }
 }

@@ -16,17 +16,26 @@ public class BackgroundService extends IntentService {
     private static boolean isRunningForground;
     private LocationTracker locationTracker;
 
-    private final CentralEvents.Listener<CentralEvents.ReceiveMessageEvent> receiveMessageEventListener = new CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>() {
+    private static class ReceiveMessageListener implements CentralEvents.Listener<CentralEvents.ReceiveMessageEvent> {
+        static String name = TAG + ".ReceiveMessageListener";
+        private final BackgroundService service;
+
+        ReceiveMessageListener(BackgroundService service) {
+            this.service = service;
+        }
+
         @Override
         public void handle(CentralEvents.ReceiveMessageEvent receiveMessageEvent) {
-            NotificationManager mNotifyMgr = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+            NotificationManager mNotifyMgr = (NotificationManager) service.getSystemService(NOTIFICATION_SERVICE);
             mNotifyMgr.notify(Codes.NOTIFYCATION_RECEIVE_MESSAGE,
-                    new NotificationCompat.Builder(BackgroundService.this)
+                    new NotificationCompat.Builder(service)
                             .setSmallIcon(R.drawable.ic_notifications_black_24dp)
-                            .setContentTitle(BackgroundService.this.getString(R.string.title_receiving_message))
+                            .setContentTitle(service.getString(R.string.title_receiving_message))
                             .setContentText("Hello World!").build());
         }
-    };
+    }
+
+    ;
 
     private static BackgroundService getInstance() {
         return instance;
@@ -51,7 +60,7 @@ public class BackgroundService extends IntentService {
     }
 
     private void onResumeForground() {
-        CentralEvents.removeListener(receiveMessageEventListener);
+        CentralEvents.removeListener(ReceiveMessageListener.name);
         switchLocationTracker();
     }
 
@@ -70,7 +79,7 @@ public class BackgroundService extends IntentService {
 
     private void onPauseForground() {
         switchLocationTracker();
-        CentralEvents.onReceiveMessage(receiveMessageEventListener);
+        CentralEvents.onReceiveMessage(ReceiveMessageListener.name, new ReceiveMessageListener(this));
 
     }
 
@@ -90,10 +99,10 @@ public class BackgroundService extends IntentService {
         instance = this;
         super.onStart(intent, startId);
         if (!isRunningForground) {
-            CentralEvents.onReceiveMessage(receiveMessageEventListener);
+            CentralEvents.onReceiveMessage(ReceiveMessageListener.name, new ReceiveMessageListener(this));
         }
 
-        CentralEvents.onStarted(new CentralEvents.Listener<CentralEvents.StartedEvent>() {
+        CentralEvents.onStarted(TAG + ".CentralEvents.Listener<CentralEvents.StartedEvent>()", new CentralEvents.Listener<CentralEvents.StartedEvent>() {
             @Override
             public void handle(CentralEvents.StartedEvent startedEvent) {
                 if (locationTracker == null) {
@@ -102,10 +111,10 @@ public class BackgroundService extends IntentService {
                 locationTracker.start(AndroidContext.get(BackgroundService.this), isRunningForground);
             }
         });
-        ViewEvents.onDestroy(new ViewEvents.Listener<ViewEvents.DestroyEvent>() {
+        ViewEvents.onDestroy(TAG + ".ViewEvents.Listener<ViewEvents.DestroyEvent>", new ViewEvents.Listener<ViewEvents.DestroyEvent>() {
             @Override
             public void handle(ViewEvents.DestroyEvent destroyEvent) {
-                CentralEvents.removeListener(receiveMessageEventListener);
+                CentralEvents.removeListener(ReceiveMessageListener.name);
                 locationTracker.stop();
             }
         });

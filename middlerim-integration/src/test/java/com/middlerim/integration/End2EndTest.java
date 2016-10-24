@@ -65,7 +65,7 @@ public class End2EndTest {
     });
     latch.await();
 
-    CentralEvents.onReceiveMessage(new CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>() {
+    CentralEvents.onReceiveMessage("End2EndTest.CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>", new CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>() {
 
       @Override
       public void handle(CentralEvents.ReceiveMessageEvent event) {
@@ -73,7 +73,7 @@ public class End2EndTest {
       }
     });
 
-    CentralEvents.onStarted(new CentralEvents.Listener<CentralEvents.StartedEvent>() {
+    CentralEvents.onStarted("End2EndTest.CentralEvents.Listener<CentralEvents.StartedEvent>", new CentralEvents.Listener<CentralEvents.StartedEvent>() {
       @Override
       public void handle(CentralEvents.StartedEvent event) {
         ViewEvents.fireResume();
@@ -196,7 +196,7 @@ public class End2EndTest {
   private void sendMessage(byte messageCommand, boolean wait) throws InterruptedException {
     String displayName = "あいう";
     ByteBuffer message = ByteBuffer.allocate(3).putChar('✌');
-    ViewEvents.fireSubmitMessage(displayName, messageCommand, message);
+    ViewEvents.fireSubmitMessage(0, displayName, messageCommand, message);
     ctx.lastReceivedTextEvent = null;
     if (wait) {
       CountDownLatch latch = new CountDownLatch(1);
@@ -207,14 +207,15 @@ public class End2EndTest {
           latch.countDown();
         }
       };
-      CentralEvents.onReceivedText(l);
+      String tmpEventListener = "tmpReceivedTextEvent";
+      CentralEvents.onReceivedText(tmpEventListener, l);
       try {
         boolean success = latch.await(1000, TimeUnit.SECONDS);
         if (!success) {
           throw new RuntimeException("Timeout: Message could't reach the central server.");
         }
       } finally {
-        CentralEvents.removeListener(l);
+        CentralEvents.removeListener(tmpEventListener);
       }
     } else {
       Thread.sleep(0);
@@ -311,6 +312,13 @@ public class End2EndTest {
     assertThat(userB.clientSequenceNo(), is((byte) (serverSessionUserB.sessionId.clientSequenceNo() + 1)));
   }
 
+  @Test
+  public void testAgainRequestFromClient() throws InterruptedException {
+    updateLocation(MARUNOUCHI_2_4_1_TOKYO);
+    // TODO
+    Session session = Sessions.getSession();
+  }
+  
   @Test
   public void testExit() throws InterruptedException {
     updateLocation(MARUNOUCHI_2_4_1_TOKYO);

@@ -1,10 +1,10 @@
 package com.middlerim.android.ui;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Rect;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.text.Editable;
 import android.text.Spannable;
@@ -15,6 +15,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ScrollView;
@@ -28,7 +29,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 
 public class NewMessageFragment extends Fragment {
-    public static final String TAG = Middlerim.TAG + ".NEW_MSG";
+    public static final String TAG = Middlerim.TAG + ".NewMsg";
 
     private static final int MAX_LENGTH = 1560;
 
@@ -38,13 +39,16 @@ public class NewMessageFragment extends Fragment {
     private ByteBuffer buf;
     private CharsetEncoder encoder = Charset.forName("UTF-8").newEncoder();
     private AndroidContext androidContext;
+    private int radius;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         super.onCreateView(inflater, container, savedInstanceState);
+        androidContext = AndroidContext.get(getActivity());
         final View view = inflater.inflate(R.layout.fragment_new_message, container, false);
         editText = (EditText) view.findViewById(R.id.new_message);
+
         editText.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
@@ -67,16 +71,6 @@ public class NewMessageFragment extends Fragment {
                 if (sendButton.isEnabled()) {
                     onSendMessageButtonClick(v);
                 }
-            }
-        });
-        view.findViewById(R.id.button_edit_area).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                // Hide IME
-                editText.setEnabled(false);
-                editText.setEnabled(true);
-
-                androidContext.fragmentManager().openMap(NewMessageFragment.this);
             }
         });
 
@@ -106,15 +100,10 @@ public class NewMessageFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
-        androidContext = AndroidContext.get(getActivity());
-        buf = ByteBuffer.allocateDirect(MAX_LENGTH * 2);
-    }
-
-    @Override
     public void onResume() {
         super.onResume();
+        buf = ByteBuffer.allocateDirect(MAX_LENGTH * 2);
+        radius = androidContext.preferences().getInt(Codes.PREF_AREA_RADIUS, 16);
         getActivity().findViewById(R.id.button_new_message).setVisibility(View.INVISIBLE);
         if (!hasContent(editText.getText().subSequence(0, editText.length()))) {
             String editingMessage = androidContext.preferences().getString(Codes.PREF_EDITING_MESSAGE, null);
@@ -177,6 +166,17 @@ public class NewMessageFragment extends Fragment {
         sendButton.setEnabled(hasContent);
     }
 
+
+    @Override
+    public void onHiddenChanged(boolean hidden) {
+        super.onHiddenChanged(hidden);
+        if (hidden) {
+            InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+            imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
+        }
+    }
+
+
     @Override
     public void onPause() {
         super.onPause();
@@ -187,11 +187,7 @@ public class NewMessageFragment extends Fragment {
             prefEditor.putString(Codes.PREF_EDITING_MESSAGE, editText.getText().subSequence(0, editText.length()).toString());
             prefEditor.apply();
         }
-    }
 
-    @Override
-    public void onStop() {
-        super.onStop();
         if (buf != null) {
             buf.clear();
             buf = null;
@@ -206,6 +202,13 @@ public class NewMessageFragment extends Fragment {
         encoder.encode(charBuffer, buf, false);
         buf.limit(buf.position());
         buf.position(0);
-        ViewEvents.fireSubmitMessage(displayName, MessageCommands.areaKM(16), buf);
+
+        int tag = androidContext.buttonQueueManager().addButton(R.drawable.ic_sync_black_24dp, new ButtonQueueManager.ButtonCallback() {
+            @Override
+            public void onClick(View v) {
+                androidContext.fragmentManager().openMinuteMessage();
+            }
+        });
+        ViewEvents.fireSubmitMessage(tag, displayName, MessageCommands.areaM(radius), buf);
     }
 }

@@ -3,7 +3,7 @@ package com.middlerim.server.storage.location;
 import com.middlerim.location.Point;
 import com.middlerim.session.Session;
 
-public class SphericalPoint implements TreePoint<SphericalPoint> {
+public final class SphericalPoint implements TreePoint<SphericalPoint> {
   private final Session session;
   private final Point point;
 
@@ -27,6 +27,11 @@ public class SphericalPoint implements TreePoint<SphericalPoint> {
   @Override
   public String toString() {
     return point.toString();
+  }
+  
+  @Override
+  public int hashCode() {
+    return super.hashCode();
   }
 
   @Override

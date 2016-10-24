@@ -50,11 +50,15 @@ public class Text {
   }
 
   public static class In implements Inbound {
+    private static int masterTag;
+
+    private final int tag;
     public final byte displayNameLength;
     public final byte messageCommand;
     public final ByteBuffer data;
 
     public In(byte displayNameLength, byte messageCommand, ByteBuffer data) {
+      this.tag = ++masterTag;
       this.displayNameLength = displayNameLength;
       this.messageCommand = messageCommand;
       this.data = data;
@@ -82,20 +86,22 @@ public class Text {
       ctx.channel().write(new OutboundMessage<>(session, new TextReceived(recipients.size())));
       for (LocationStorage.Entry entry : recipients) {
         Session recipient = entry.session();
-        ctx.channel().write(new OutboundMessage<>(recipient, new Out(point, displayNameLength, messageCommand, data, dataLength)));
+        ctx.channel().write(new OutboundMessage<>(recipient, new Out(tag, point, displayNameLength, messageCommand, data, dataLength)));
       }
     }
   }
 
   public static class Out implements Outbound, SequentialMessage {
 
+    public final int tag;
     public final Point point;
     public final int displayNameLength;
     public final byte messageCommand;
     public final ByteBuffer data;
     public final int dataLength;
 
-    public Out(Point point, byte displayNameLength, byte messageCommand, ByteBuffer data, int dataLength) {
+    public Out(int tag, Point point, byte displayNameLength, byte messageCommand, ByteBuffer data, int dataLength) {
+      this.tag = tag;
       this.point = point;
       this.displayNameLength = displayNameLength;
       this.messageCommand = messageCommand;
@@ -129,6 +135,11 @@ public class Text {
     @Override
     public int byteSize() {
       return 17 + dataLength;
+    }
+
+    @Override
+    public int tag() {
+      return tag;
     }
   }
 }

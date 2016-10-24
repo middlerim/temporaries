@@ -30,8 +30,7 @@ public class SimpleTreeTest {
   }
 
   public static Session createDummySession(int i) {
-    byte[] bs = Bytes.longToBytes(i);
-    SessionId sessionId = new SessionId(Bytes.reverse(bs));
+    SessionId sessionId = new SessionId(i);
     return Session.create(sessionId, null);
   }
 

@@ -8,18 +8,18 @@ import com.middlerim.server.message.Location;
 import com.middlerim.server.storage.location.LocationStorage;
 import com.middlerim.server.storage.location.SphericalPoint;
 import com.middlerim.server.storage.location.VpTree;
-import com.middlerim.server.storage.persistent.FixedLayoutPersistentStorage;
-import com.middlerim.server.storage.persistent.StorageInformation;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.session.SessionListener;
+import com.middlerim.storage.persistent.FixedLayoutPersistentStorage;
+import com.middlerim.storage.persistent.StorageInformation;
 
 public final class Locations {
   private static final LocationStorage<SphericalPoint> map = new VpTree<>();
   private static final FixedLayoutPersistentStorage<Location> persistentStorage = new FixedLayoutPersistentStorage<>(
       new StorageInformation<Location>("locations",
           Location.SERIALIZED_BYTE_SIZE,
-          Location.SERIALIZED_BYTE_SIZE * (Config.TEST ? 10000 : SessionId.MAX_USER_SIZE)));
+          Location.SERIALIZED_BYTE_SIZE * (Config.TEST ? 10_000 : SessionId.MAX_USER_SIZE), (Config.TEST ? 100_000 : 100_000_000)));
 
   public static void updateLocation(Session session, Location location) {
     map.put(new SphericalPoint(session, location.point));

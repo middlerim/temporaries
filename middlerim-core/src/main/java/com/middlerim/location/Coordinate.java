@@ -15,6 +15,16 @@ public final class Coordinate {
   }
 
   @Override
+  public boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    Coordinate b = (Coordinate) obj;
+    return (int) (latitude * Point.GETA) == (int) (b.latitude * Point.GETA)
+        && (int) (longitude * Point.GETA) == (int) (b.longitude * Point.GETA);
+  }
+
+  @Override
   public String toString() {
     return "(" + latitude + ", " + longitude + ")";
   }

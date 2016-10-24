@@ -2,7 +2,7 @@ package com.middlerim.server;
 
 public final class MessageCommands {
 
-  public static final int MIN_METER = 32;
+  public static final int MIN_METER = 16;
 
   private MessageCommands() {
   }
@@ -14,12 +14,14 @@ public final class MessageCommands {
 
   public static byte areaM(int radius) {
     if (radius < MIN_METER) {
-      throw new IllegalStateException("Radius for meter must be over or equal to 32");
+      throw new IllegalStateException("Radius for meter must be over or equal to 16 but " + radius);
     }
     if (radius < 100) {
       return area(radius, AREA_M);
-    } else {
+    } else if (radius < 1000) {
       return area(radius, AREA_100M);
+    } else {
+      return area(radius / 1000, AREA_KM);
     }
   }
 

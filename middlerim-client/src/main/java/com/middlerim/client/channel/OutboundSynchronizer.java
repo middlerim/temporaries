@@ -27,9 +27,11 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
   static final ArrayDeque<MessageAndContext> MESSAGE_QUEUE = new ArrayDeque<>(Config.MAX_MESSAGE_QUEUE);
 
   private final ViewContext viewContext;
-  private Timer retryTask = new Timer("OutboundMessage-retry", true);
+  private Timer retryTask;
   private long totalMsgSent = 1;
   private long startTimeMillis = System.currentTimeMillis();
+  private boolean working;
+  private MessageAndContext lastPossiblyDiscardedMessage;
 
   public OutboundSynchronizer(ViewContext viewContext) {
     this.viewContext = viewContext;
@@ -37,28 +39,44 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
   }
 
   private void initializeEventHandlers() {
-    CentralEvents.onReceived(new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
+    CentralEvents.onReceived(TAG + ".CentralEvents.Listener<CentralEvents.ReceivedEvent>", new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
       @Override
       public void handle(CentralEvents.ReceivedEvent event) {
+        working = true;
         synchronized (MESSAGE_QUEUE) {
           MESSAGE_QUEUE.poll(); // Remove first.
         }
+        sendLastPossiblyDiscardedMessage();
         totalMsgSent++;
         sendFromQueue();
       }
     });
-    ViewEvents.onResume(new ViewEvents.Listener<ViewEvents.ResumeEvent>() {
+    ViewEvents.onResume(TAG + ".ViewEvents.Listener<ViewEvents.ResumeEvent>", new ViewEvents.Listener<ViewEvents.ResumeEvent>() {
       @Override
       public void handle(ViewEvents.ResumeEvent event) {
-        retryTask.schedule(new RetryTimerTask(null, 0), Config.MIN_RETRY_RERIOD_MILLIS);
+        if (retryTask != null) {
+          retryTask.cancel();
+        }
+        retryTask = new Timer(Config.INTERNAL_APP_NAME + "-sync", true);
+        retryTask.schedule(new RetryTimerTask(MESSAGE_QUEUE.peek(), 0), Config.MIN_RETRY_RERIOD_MILLIS);
       }
     });
-    ViewEvents.onPause(new ViewEvents.Listener<ViewEvents.PauseEvent>() {
+    ViewEvents.onPause(TAG + ".ViewEvents.Listener<ViewEvents.PauseEvent>", new ViewEvents.Listener<ViewEvents.PauseEvent>() {
       @Override
       public void handle(ViewEvents.PauseEvent event) {
-        retryTask.cancel();
+        if (retryTask != null) {
+          retryTask.cancel();
+          retryTask = null;
+        }
       }
     });
+  }
+
+  private void sendLastPossiblyDiscardedMessage() {
+    if (lastPossiblyDiscardedMessage != null && !Sessions.getSession().isNotAssigned()) {
+      lastPossiblyDiscardedMessage.context.writeAndFlush(lastPossiblyDiscardedMessage.message);
+      lastPossiblyDiscardedMessage = null;
+    }
   }
 
   private ChannelFuture sendFromQueue() {
@@ -70,6 +88,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     recipient.sessionId.incrementClientSequenceNo();
     viewContext.logger().debug(TAG, "Sending the message " + next.message);
     return next.context.writeAndFlush(next.message);
+
   }
 
   public long averageMessageSentMillis() {
@@ -100,7 +119,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       if (mc.message == Markers.ASSIGN_AID) {
         return true;
       }
-      mc.context.write(Markers.ASSIGN_AID);
+      mc.context.writeAndFlush(Markers.ASSIGN_AID);
       return false;
     }
 
@@ -123,12 +142,13 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
         return;
       }
       // Retry
+      working = false;
       long wait = retryCount * (long) Math.pow(2, retryCount) * 1000 + Config.MIN_RETRY_RERIOD_MILLIS;
       wait = wait <= Config.MAX_RETRY_RERIOD_MILLIS ? wait : Config.MAX_RETRY_RERIOD_MILLIS;
       Session session = Sessions.getSession();
       viewContext.logger().debug(TAG, "Central server seems to stop. Wait for re-sending the message " + session + " for " + wait + "millis");
 
-      prev.context.write(prev.message);
+      prev.context.writeAndFlush(prev.message);
       retryTask.schedule(new RetryTimerTask(prev, retryCount + 1), wait);
     }
   }
@@ -158,7 +178,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     if (message instanceof SequentialMessage) {
       if (MESSAGE_QUEUE.size() >= Config.MAX_MESSAGE_QUEUE) {
         // Message queue is full.
-        CentralEvents.fireLostMessage(message);
+        CentralEvents.fireLostMessage((SequentialMessage) message, CentralEvents.LostMessageEvent.Type.LIMIT);
         return;
       }
       boolean added;
@@ -166,18 +186,22 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
         added = MESSAGE_QUEUE.offer(new MessageAndContext(message, ctx));
       }
       if (!added) {
-        CentralEvents.fireLostMessage(message);
+        CentralEvents.fireLostMessage((SequentialMessage) message, CentralEvents.LostMessageEvent.Type.LIMIT);
         return;
       }
       sendFromQueue();
       return;
     } else {
       if (Sessions.getSession().isNotAssigned()) {
+        lastPossiblyDiscardedMessage = new MessageAndContext(message, ctx);
         // Currently the client is working on connecting with central server.
         viewContext.logger().warn(TAG, "Discarded the message" + message + " since the session has not been created yet.");
         ctx.write(Markers.ASSIGN_AID);
         return;
       } else {
+        if (!working) {
+          lastPossiblyDiscardedMessage = new MessageAndContext(message, ctx);
+        }
         ctx.writeAndFlush(message);
         return;
       }

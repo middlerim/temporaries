@@ -1,6 +1,9 @@
+ext {
+  nettyVersion = '4.1.6.Final'
+}
 allprojects {
   group = 'com.middlerim'
-  version = '0.2'
+  version = '0.3'
 
   repositories {
     jcenter()

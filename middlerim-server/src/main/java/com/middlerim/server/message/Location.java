@@ -6,9 +6,9 @@ import com.middlerim.location.Point;
 import com.middlerim.message.Inbound;
 import com.middlerim.server.channel.AttributeKeys;
 import com.middlerim.server.storage.Locations;
-import com.middlerim.server.storage.persistent.Persistent;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
+import com.middlerim.storage.persistent.Persistent;
 
 import io.netty.channel.ChannelHandlerContext;
 

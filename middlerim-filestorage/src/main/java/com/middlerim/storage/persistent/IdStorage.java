@@ -1,4 +1,4 @@
-package com.middlerim.server.storage.persistent;
+package com.middlerim.storage.persistent;
 
 import java.io.Closeable;
 import java.io.File;
@@ -31,8 +31,8 @@ public class IdStorage implements Closeable {
     } catch (IOException e) {
       throw new RuntimeException("Could not open or create file. path: " + info.path(), e);
     }
-    this.buf = ByteBuffer.allocate(Long.BYTES);
-    this.buf.limit(Long.BYTES);
+    this.buf = ByteBuffer.allocate(8);
+    this.buf.limit(8);
   }
 
   private FileChannel getChannel() throws IOException {

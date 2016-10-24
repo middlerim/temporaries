@@ -1,9 +1,9 @@
-package com.middlerim.server.storage.persistent;
+package com.middlerim.storage.persistent;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-import com.middlerim.server.Config;
+import com.middlerim.Config;
 
 public class IdStorageInformation {
 

@@ -10,7 +10,7 @@ public class MessageCommandsTest {
   @Test
   public void testMeter() {
 
-    for (int i = 32; i < 100; i += 8) {
+    for (int i = 16; i < 100; i += 8) {
       byte area = MessageCommands.areaM(i);
       assertTrue(i + ":" + Integer.toBinaryString(area), MessageCommands.isArea(area));
       int meter = MessageCommands.toMeter(area);

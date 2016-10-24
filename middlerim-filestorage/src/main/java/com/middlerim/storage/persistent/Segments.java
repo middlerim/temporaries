@@ -1,4 +1,4 @@
-package com.middlerim.server.storage.persistent;
+package com.middlerim.storage.persistent;
 
 import java.io.Closeable;
 import java.io.File;
@@ -10,8 +10,6 @@ import java.util.Arrays;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import com.middlerim.server.Config;
 
 // (!) The instance is NOT thread-safe.
 class Segments<L extends Persistent<L>> implements Closeable {
@@ -28,10 +26,8 @@ class Segments<L extends Persistent<L>> implements Closeable {
   Segments(StorageInformation<L> info) {
     BackgroundService.closeOnShutdown(this);
     this.info = info;
-    if (Config.TEST) {
-      this.segmentSize = 160 - (160 % info.recordSize());
-    } else if (info.maxStorageSize() > Config.MAX_STORAGE_SEGMENT_SIZE) {
-      this.segmentSize = Config.MAX_STORAGE_SEGMENT_SIZE - (Config.MAX_STORAGE_SEGMENT_SIZE % info.recordSize());
+    if (info.maxStorageSize() > info.segmentSize()) {
+      this.segmentSize = info.segmentSize() - (info.segmentSize() % info.recordSize());
     } else {
       this.segmentSize = info.maxStorageSize();
     }

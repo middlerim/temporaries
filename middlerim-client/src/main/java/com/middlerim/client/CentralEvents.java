@@ -2,25 +2,31 @@ package com.middlerim.client;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.middlerim.location.Coordinate;
-import com.middlerim.message.Outbound;
+import com.middlerim.message.SequentialMessage;
 
 public final class CentralEvents {
 
-  private static final List<Listener<StartedEvent>> startedListeners = new ArrayList<>(1);
-  private static final List<Listener<ErrorEvent>> errorListeners = new ArrayList<>(1);
-  private static final List<Listener<ReceiveMessageEvent>> receiveMessageListeners = new ArrayList<>(1);
-  private static final List<Listener<ReceivedEvent>> receivedListeners = new ArrayList<>(1);
-  private static final List<Listener<ReceivedTextEvent>> receivedTextListeners = new ArrayList<>(1);
-  private static final List<Listener<LostMessageEvent>> lostMessageListeners = new ArrayList<>(1);
-  private static final List<Listener<SendMessageEvent>> sendMessageListeners = new ArrayList<>(1);
-
+  private static final List<Listener<StartedEvent>> startedListeners = new ArrayList<>(2);
+  private static final List<Listener<ErrorEvent>> errorListeners = new ArrayList<>(2);
+  private static final List<Listener<ReceiveMessageEvent>> receiveMessageListeners = new ArrayList<>(2);
+  private static final List<Listener<ReceivedEvent>> receivedListeners = new ArrayList<>(2);
+  private static final List<Listener<ReceivedTextEvent>> receivedTextListeners = new ArrayList<>(2);
+  private static final List<Listener<LostMessageEvent>> lostMessageListeners = new ArrayList<>(2);
+  private static final List<Listener<SendMessageEvent>> sendMessageListeners = new ArrayList<>(2);
+  private static final Map<String, Listener<?>> listeneres = new HashMap<>();
   private static AtomicBoolean started = new AtomicBoolean(false);
 
-  public static void removeListener(Listener<? extends Event> listener) {
+  public static void removeListener(String name) {
+    Listener<?> listener = listeneres.remove(name);
+    if (listener == null) {
+      throw new IllegalStateException(name + " hasn't been added.");
+    }
     startedListeners.remove(listener);
     errorListeners.remove(listener);
     receiveMessageListeners.remove(listener);
@@ -30,45 +36,46 @@ public final class CentralEvents {
     sendMessageListeners.remove(listener);
   }
 
-  private static <E extends Event> void addListener(Listener<E> listener, List<Listener<E>> ls) {
-    if (ls.contains(listener)) {
-      throw new IllegalStateException();
+  private static <E extends Event> void addListener(String name, Listener<E> listener, List<Listener<E>> ls) {
+    if (listeneres.containsKey(name)) {
+      removeListener(name);
     }
+    listeneres.put(name, listener);
     ls.add(listener);
   }
 
-  public static void onStarted(Listener<StartedEvent> listener) {
+  public static void onStarted(String name, Listener<StartedEvent> listener) {
     synchronized (started) {
       if (started.get()) {
         listener.handle(new StartedEvent());
       } else {
-        addListener(listener, startedListeners);
+        addListener(name, listener, startedListeners);
       }
     }
   }
 
-  public static void onError(Listener<ErrorEvent> listener) {
-    addListener(listener, errorListeners);
+  public static void onError(String name, Listener<ErrorEvent> listener) {
+    addListener(name, listener, errorListeners);
   }
 
-  public static void onReceiveMessage(Listener<ReceiveMessageEvent> listener) {
-    addListener(listener, receiveMessageListeners);
+  public static void onReceiveMessage(String name, Listener<ReceiveMessageEvent> listener) {
+    addListener(name, listener, receiveMessageListeners);
   }
 
-  public static void onReceived(Listener<ReceivedEvent> listener) {
-    addListener(listener, receivedListeners);
+  public static void onReceived(String name, Listener<ReceivedEvent> listener) {
+    addListener(name, listener, receivedListeners);
   }
 
-  public static void onReceivedText(Listener<ReceivedTextEvent> listener) {
-    addListener(listener, receivedTextListeners);
+  public static void onReceivedText(String name, Listener<ReceivedTextEvent> listener) {
+    addListener(name, listener, receivedTextListeners);
   }
 
-  public static void onLostMessage(Listener<LostMessageEvent> listener) {
-    addListener(listener, lostMessageListeners);
+  public static void onLostMessage(String name, Listener<LostMessageEvent> listener) {
+    addListener(name, listener, lostMessageListeners);
   }
 
-  public static void onSendMessage(Listener<SendMessageEvent> listener) {
-    addListener(listener, sendMessageListeners);
+  public static void onSendMessage(String name, Listener<SendMessageEvent> listener) {
+    addListener(name, listener, sendMessageListeners);
   }
 
   public static interface Listener<EV extends Event> {
@@ -124,18 +131,25 @@ public final class CentralEvents {
   }
 
   public static class LostMessageEvent implements Event {
-    public final Outbound message;
+    public final SequentialMessage message;
+    public final LostMessageEvent.Type type;
+    public enum Type {
+        LIMIT
+    }
 
-    private LostMessageEvent(Outbound message) {
+    private LostMessageEvent(SequentialMessage message, LostMessageEvent.Type type) {
       this.message = message;
+      this.type = type;
     }
   }
 
   public static class SendMessageEvent implements Event {
+    public final int tag;
     public final byte clientSequenceNo;
     public final String displayName;
     public final ByteBuffer message;
-    private SendMessageEvent(byte clientSequenceNo, String displayName, ByteBuffer message) {
+    private SendMessageEvent(int tag, byte clientSequenceNo, String displayName, ByteBuffer message) {
+      this.tag = tag;
       this.clientSequenceNo = clientSequenceNo;
       this.displayName = displayName;
       this.message = message;
@@ -172,11 +186,11 @@ public final class CentralEvents {
     handleEvent(new ReceivedTextEvent(clientSequenceNo, numberOfDelivery), receivedTextListeners);
   }
 
-  public static void fireLostMessage(Outbound message) {
-    handleEvent(new LostMessageEvent(message), lostMessageListeners);
+  public static void fireLostMessage(SequentialMessage message, LostMessageEvent.Type type) {
+    handleEvent(new LostMessageEvent(message, type), lostMessageListeners);
   }
 
-  public static void fireSendMessage(byte clientSequenceNo, String displayName, ByteBuffer messageBytes) {
-    handleEvent(new SendMessageEvent(clientSequenceNo, displayName, messageBytes), sendMessageListeners);
+  public static void fireSendMessage(int tag, byte clientSequenceNo, String displayName, ByteBuffer messageBytes) {
+    handleEvent(new SendMessageEvent(tag, clientSequenceNo, displayName, messageBytes), sendMessageListeners);
   }
 }

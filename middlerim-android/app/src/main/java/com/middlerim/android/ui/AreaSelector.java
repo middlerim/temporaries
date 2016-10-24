@@ -7,7 +7,9 @@ import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.widget.SeekBar;
 
-public class AreaSelector extends SeekBar {
+import com.middlerim.client.view.ViewEvents;
+
+public class AreaSelector extends SeekBar implements SeekBar.OnSeekBarChangeListener {
 
     public AreaSelector(Context context) {
         super(context);
@@ -25,6 +27,10 @@ public class AreaSelector extends SeekBar {
         super.onSizeChanged(h, w, oldh, oldw);
     }
 
+    {
+        setOnSeekBarChangeListener(this);
+    }
+
     @Override
     protected synchronized void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(heightMeasureSpec, widthMeasureSpec);
@@ -38,7 +44,7 @@ public class AreaSelector extends SeekBar {
         super.onDraw(c);
     }
 
-    public int progressToRadius(int progress) {
+    protected int progressToRadius(int progress) {
         if (progress <= 0) {
             return 16;
         }
@@ -73,5 +79,19 @@ public class AreaSelector extends SeekBar {
                 break;
         }
         return true;
+    }
+
+    @Override
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        int radius = progressToRadius(progress);
+        ViewEvents.fireChangeArea(radius);
+    }
+
+    @Override
+    public void onStartTrackingTouch(SeekBar seekBar) {
+    }
+
+    @Override
+    public void onStopTrackingTouch(SeekBar seekBar) {
     }
 }

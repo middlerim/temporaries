@@ -1,18 +1,15 @@
 package com.middlerim.android.ui;
 
-import android.app.Activity;
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
-import android.support.v4.app.FragmentTransaction;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 public class AreaSelectorFragment extends Fragment {
+    public static final String TAG = Middlerim.TAG + ".Area";
 
     private MapFragment map;
     private AreaSelector areaSelector;
@@ -25,12 +22,11 @@ public class AreaSelectorFragment extends Fragment {
     }
 
     @Override
-    public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
-        super.onViewCreated(view, savedInstanceState);
+    public void onStart() {
+        super.onStart();
         androidContext = AndroidContext.get(getActivity());
-        map = androidContext.fragmentManager().findById(R.id.fragment_map);
-        areaSelector = (AreaSelector) view.findViewById(R.id.area_selector);
-        areaSelector.setOnSeekBarChangeListener(map);
+        map = androidContext.fragmentManager().getMapFragment();
+        areaSelector = (AreaSelector) getView().findViewById(R.id.area_selector);
     }
 
     @Override
@@ -46,6 +42,7 @@ public class AreaSelectorFragment extends Fragment {
         map.hideAreaCircle();
         SharedPreferences.Editor prefEditor = androidContext.preferences().edit();
         prefEditor.putInt(Codes.PREF_AREA_PROGRESS, areaSelector.getProgress());
+        prefEditor.putInt(Codes.PREF_AREA_RADIUS, areaSelector.progressToRadius(areaSelector.getProgress()));
         prefEditor.apply();
     }
 }

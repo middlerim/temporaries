@@ -10,8 +10,8 @@ public final class SessionId {
   public static final long UNASSIGNED_USERID = 0;
   public static final byte UNASSIGNED_SEQUENCE_NO = 1;
   public static final long MAX_USER_SIZE = 4_294_967_295L;
-  public static final long ANONYMOUS_USER_FROM = MAX_USER_SIZE - 2_000_000_000;
-  public static final long ANONYMOUS_USER_TO = MAX_USER_SIZE;
+  public static final int ANONYMOUS_USER_FROM = 1;
+  public static final int ANONYMOUS_USER_TO = 2_000_000_000;
 
   private final int userId; // 0 < MAX_USER_SIZE
   private final int hashCode;
@@ -19,8 +19,11 @@ public final class SessionId {
   private short serverSequenceNo; // Short.MIN < Short.MAX
 
   public SessionId(long id) {
+    if (id > MAX_USER_SIZE) {
+      throw new IllegalArgumentException();
+    }
     this.userId = (int) id;
-    this.hashCode = userId ^ (userId >>> 16);
+    this.hashCode = userId;
 
     // Assign random sequence no at first to prevent invalid access.
     while (true) {

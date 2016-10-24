@@ -3,6 +3,7 @@ package com.middlerim.server.storage.location;
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
 
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,13 +15,13 @@ import com.middlerim.session.Session;
 
 public class PerformanceTest {
 
-  private static final int SIZE = 1_000;
-  private static final byte AREA = MessageCommands.areaKM(16);
+  private static final int SIZE = 10_000_000;
+  private static final byte AREA = MessageCommands.areaKM(80);
 
   // SIZE = 10_000_000
   // AREA = MessageCommands.areaKM(16)
   // VP Tree Found:47
-  // Heap size:1,943,234,184
+  // Heap size:1,943MB
   // Build time:
   // VP Tree(Dynamic): 253716ms
   // Find time:
@@ -58,46 +59,46 @@ public class PerformanceTest {
     // }
     long vpBulkBuildTime = 0;
     long vpBulkFindTime = 0;
-    // {
-    // long start = System.currentTimeMillis();
-    // List<SphericalPoint> vpPoints = new ArrayList<>(SIZE);
-    // vpPoints.add(new SphericalPoint(session, points.get(0)));
-    // for (int i = 1; i < SIZE; ++i) {
-    // vpPoints.add(new SphericalPoint(SimpleTreeTest.createDummySession(i), points.get(i)));
-    // }
-    // VpTree<SphericalPoint> tree = VpTree.buildVpTree(vpPoints);
-    //// System.out.println(tree.toString());
-    // assertThat(tree.size(), is(SIZE));
-    // vpBulkBuildTime = (System.currentTimeMillis() - start);
-    // start = System.nanoTime();
-    // List<SphericalPoint> found = tree.findAround(session.sessionId, AREA);
-    // vpBulkFindTime = System.nanoTime() - start;
-    // System.out.println(" VP Tree Found: " + found.size());
-    // if (found.size() == 0) {
-    // tree.findAround(session.sessionId, AREA);
-    // }
-    // }
-    long vpDynamicBuildTime = 0;
-    long vpDynamicFindTime = 0;
     {
       long start = System.currentTimeMillis();
-      VpTree<SphericalPoint> tree = new VpTree<>();
-      tree.put(new SphericalPoint(session, points.get(0)));
+      List<SphericalPoint> vpPoints = new ArrayList<>(SIZE);
+      vpPoints.add(new SphericalPoint(session, points.get(0)));
       for (int i = 1; i < SIZE; ++i) {
-        tree.put(new SphericalPoint(SimpleTreeTest.createDummySession(i), points.get(i)));
+        vpPoints.add(new SphericalPoint(SimpleTreeTest.createDummySession(i), points.get(i)));
       }
+      VpTree<SphericalPoint> tree = VpTree.buildVpTree(vpPoints);
       // System.out.println(tree.toString());
       assertThat(tree.size(), is(SIZE));
-      vpDynamicBuildTime = (System.currentTimeMillis() - start);
+      vpBulkBuildTime = (System.currentTimeMillis() - start);
       start = System.nanoTime();
       List<SphericalPoint> found = tree.findAround(session.sessionId, AREA);
-      vpDynamicFindTime = System.nanoTime() - start;
-      System.out.println("    VP Tree Found: " + found.size());
+      vpBulkFindTime = System.nanoTime() - start;
+      System.out.println(" VP Tree(bulk) Found: " + found.size());
       if (found.size() == 0) {
         tree.findAround(session.sessionId, AREA);
       }
     }
-    System.out.println("Heap size:" + (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() - heap));
+    long vpDynamicBuildTime = 0;
+    long vpDynamicFindTime = 0;
+    {
+//      long start = System.currentTimeMillis();
+//      VpTree<SphericalPoint> tree = new VpTree<>();
+//      tree.put(new SphericalPoint(session, points.get(0)));
+//      for (int i = 1; i < SIZE; ++i) {
+//        tree.put(new SphericalPoint(SimpleTreeTest.createDummySession(i), points.get(i)));
+//      }
+//      // System.out.println(tree.toString());
+//      assertThat(tree.size(), is(SIZE));
+//      vpDynamicBuildTime = (System.currentTimeMillis() - start);
+//      start = System.nanoTime();
+//      List<SphericalPoint> found = tree.findAround(session.sessionId, AREA);
+//      vpDynamicFindTime = System.nanoTime() - start;
+//      System.out.println("    VP Tree(Dynamic) Found: " + found.size());
+//      if (found.size() == 0) {
+//        tree.findAround(session.sessionId, AREA);
+//      }
+    }
+    System.out.println("Heap size:" + NumberFormat.getIntegerInstance().format((Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory() - heap) / 1024 / 1024) + "MiB");
 
     System.out.println("Build time:");
     // System.out.println(" Simple Tree: " + simpleBuildTime + "ms");

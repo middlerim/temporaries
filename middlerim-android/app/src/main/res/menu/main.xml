@@ -4,21 +4,21 @@
     android:id="@+id/menu_main">
     <item
         android:id="@+id/action_settings"
-        android:orderInCategory="100"
+        android:orderInCategory="98"
         android:title="@string/menu_settings"
         app:showAsAction="never" />
 
     <item
         android:id="@+id/action_signIn"
-        android:orderInCategory="100"
+        android:orderInCategory="99"
         android:title="@string/menu_login"
         app:showAsAction="never" />
 
-
     <item
-        android:id="@+id/action_search"
-        android:icon="@drawable/ic_search_black_24px"
-        android:orderInCategory="200"
-        android:title="Search"
-        app:showAsAction="ifRoom"></item>
+        android:id="@+id/action_editArea"
+        android:icon="@drawable/button_edit_area"
+        android:orderInCategory="1"
+        android:title="@string/menu_editArea"
+        app:showAsAction="ifRoom" />
+
 </menu>

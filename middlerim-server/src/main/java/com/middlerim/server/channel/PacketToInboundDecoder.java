@@ -49,7 +49,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
         LOG.warn("Packet[ASSIGN_AID]: Ignored(Invalid length). {}", in);
         return;
       }
-      Session anonymous = Sessions.getOrCreateSession(SessionId.ANONYMOUS, msg.sender());
+      Session anonymous = Sessions.getOrCreateAnonymous(msg.sender());
       LOG.debug("Packet[ASSIGN_AID]: {}", anonymous);
       ctx.channel().write(new OutboundMessage<>(anonymous, Markers.ASSIGN_AID));
       return;

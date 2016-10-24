@@ -22,7 +22,7 @@ public class LocationTracker {
     private static final float LOCATION_DISTANCE_BG = LOCATION_DISTANCE_FG * 2;
 
     private LocationManager locationManager;
-    private AndroidContext ctx;
+    private AndroidContext androidContext;
     private boolean isForeground;
     private boolean isStarted;
 
@@ -55,20 +55,21 @@ public class LocationTracker {
     private final LocationListener locationListener = new LocationListener();
 
     public void switchTrackingMode(boolean isForeground) {
-        if (!(isForeground ^ this.isForeground)) {
+        if (isForeground == this.isForeground) {
             return;
         }
         this.isForeground = isForeground;
         stop();
         initLocationManager();
+        androidContext.logger().debug(TAG, "Changed to " + (isForeground ? "forground" : "background") + " mode.");
     }
 
-    public void start(final AndroidContext ctx, final boolean isForeground) {
+    public void start(final AndroidContext androidContext, final boolean isForeground) {
         if (isStarted) {
             return;
         }
         isStarted = true;
-        this.ctx = ctx;
+        this.androidContext = androidContext;
         this.isForeground = isForeground;
         initLocationManager();
     }
@@ -77,14 +78,14 @@ public class LocationTracker {
         if (!checkPermission()) {
             return;
         }
-        new Handler(ctx.getContext().getMainLooper()).postDelayed(new Runnable() {
+        new Handler(androidContext.getContext().getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (!checkPermission()) {
                     return;
                 }
                 if (locationManager == null) {
-                    locationManager = (LocationManager) ctx.getContext().getSystemService(Context.LOCATION_SERVICE);
+                    locationManager = (LocationManager) androidContext.getContext().getSystemService(Context.LOCATION_SERVICE);
                 }
                 Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
                 if (lastKnownLocation == null) {
@@ -112,6 +113,6 @@ public class LocationTracker {
     }
 
     private boolean checkPermission() {
-        return ActivityCompat.checkSelfPermission(ctx.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
+        return ActivityCompat.checkSelfPermission(androidContext.getContext(), Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED;
     }
 }
