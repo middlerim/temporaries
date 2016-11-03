@@ -8,7 +8,7 @@ public final class Config extends com.middlerim.Config {
   }
 
   public static final int MAX_ACTIVE_SESSION_SIZE = 100_000_000;
-  public static final long SESSION_TIMEOUT_MILLIS = 24 * 60 * 60 * 1000;
+  public static final long SESSION_TIMEOUT_MILLIS = 1 * 60 * 1000;
 
   public static final int MAX_RECEIVE_BUFFER_SIZE = MAX_PACKET_SIZE * 1000;
   

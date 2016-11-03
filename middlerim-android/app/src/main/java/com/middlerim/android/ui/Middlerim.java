@@ -1,17 +1,15 @@
 package com.middlerim.android.ui;
 
-import android.os.StrictMode;
-
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.StrictMode;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.util.SparseIntArray;
-import android.view.Menu;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
@@ -19,7 +17,11 @@ import android.widget.Toast;
 import com.middlerim.client.CentralEvents;
 import com.middlerim.client.view.ViewEvents;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class Middlerim extends AppCompatActivity {
+    private static final Logger LOG = LoggerFactory.getLogger(Middlerim.class);
     public static final String TAG = "Middlerim";
 
     private Toolbar toolbar;
@@ -33,6 +35,7 @@ public class Middlerim extends AppCompatActivity {
         StrictMode.setThreadPolicy(policy);
 
     }
+
     private CentralEvents.Listener<CentralEvents.ErrorEvent> errorEventListener = new CentralEvents.Listener<CentralEvents.ErrorEvent>() {
         @Override
         public void handle(CentralEvents.ErrorEvent event) {
@@ -96,7 +99,7 @@ public class Middlerim extends AppCompatActivity {
                     buttonQueueIds.delete(i);
                     androidContext.buttonQueueManager().removeButton(leftOverTag);
                 }
-                androidContext.logger().warn(TAG, "The message which sent just before the message which sent the time are not match. prev: "
+                LOG.warn("The message which sent just before the message which sent the time are not match. prev: "
                         + lastReveicedSequenceNo + ", curr: " + event.clientSequenceNo);
             }
             lastReveicedSequenceNo = event.clientSequenceNo;
@@ -211,6 +214,13 @@ public class Middlerim extends AppCompatActivity {
     private void requestGps() {
         final GpsDisabledAlertDialogFragment alertDialog = new GpsDisabledAlertDialogFragment();
         alertDialog.show(getSupportFragmentManager(), TAG);
+    }
+
+
+    public void showToolbar() {
+        toolbar.setTop(0);
+        toolbar.setBottom(originalToolbarHeight);
+        toolbar.setVisibility(View.VISIBLE);
     }
 
     public void setToolbarHandler(View view) {

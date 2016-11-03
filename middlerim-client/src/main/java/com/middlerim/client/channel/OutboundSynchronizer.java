@@ -4,11 +4,13 @@ import java.util.ArrayDeque;
 import java.util.Timer;
 import java.util.TimerTask;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.middlerim.client.CentralEvents;
 import com.middlerim.client.Config;
 import com.middlerim.client.message.Markers;
 import com.middlerim.client.session.Sessions;
-import com.middlerim.client.view.ViewContext;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.message.Outbound;
 import com.middlerim.message.SequentialMessage;
@@ -21,25 +23,23 @@ import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 
 public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
-  private static final String TAG = "OutSync";
+  private static final Logger LOG = LoggerFactory.getLogger(OutboundSynchronizer.class);
 
   // Queue for sequential messages.
   static final ArrayDeque<MessageAndContext> MESSAGE_QUEUE = new ArrayDeque<>(Config.MAX_MESSAGE_QUEUE);
 
-  private final ViewContext viewContext;
   private Timer retryTask;
   private long totalMsgSent = 1;
   private long startTimeMillis = System.currentTimeMillis();
   private boolean working;
   private MessageAndContext lastPossiblyDiscardedMessage;
 
-  public OutboundSynchronizer(ViewContext viewContext) {
-    this.viewContext = viewContext;
+  public OutboundSynchronizer() {
     initializeEventHandlers();
   }
 
   private void initializeEventHandlers() {
-    CentralEvents.onReceived(TAG + ".CentralEvents.Listener<CentralEvents.ReceivedEvent>", new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
+    CentralEvents.onReceived("OutboundSynchronizer.CentralEvents.Listener<CentralEvents.ReceivedEvent>", new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
       @Override
       public void handle(CentralEvents.ReceivedEvent event) {
         working = true;
@@ -51,7 +51,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
         sendFromQueue();
       }
     });
-    ViewEvents.onResume(TAG + ".ViewEvents.Listener<ViewEvents.ResumeEvent>", new ViewEvents.Listener<ViewEvents.ResumeEvent>() {
+    ViewEvents.onResume("OutboundSynchronizer.ViewEvents.Listener<ViewEvents.ResumeEvent>", new ViewEvents.Listener<ViewEvents.ResumeEvent>() {
       @Override
       public void handle(ViewEvents.ResumeEvent event) {
         if (retryTask != null) {
@@ -61,7 +61,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
         retryTask.schedule(new RetryTimerTask(MESSAGE_QUEUE.peek(), 0), Config.MIN_RETRY_RERIOD_MILLIS);
       }
     });
-    ViewEvents.onPause(TAG + ".ViewEvents.Listener<ViewEvents.PauseEvent>", new ViewEvents.Listener<ViewEvents.PauseEvent>() {
+    ViewEvents.onPause("OutboundSynchronizer.ViewEvents.Listener<ViewEvents.PauseEvent>", new ViewEvents.Listener<ViewEvents.PauseEvent>() {
       @Override
       public void handle(ViewEvents.PauseEvent event) {
         if (retryTask != null) {
@@ -86,7 +86,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     }
     Session recipient = Sessions.getSession();
     recipient.sessionId.incrementClientSequenceNo();
-    viewContext.logger().debug(TAG, "Sending the message " + next.message);
+    LOG.debug("Sending the message " + next.message);
     return next.context.writeAndFlush(next.message);
 
   }
@@ -137,7 +137,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
         } else if (wait > Config.MAX_RETRY_RERIOD_MILLIS) {
           wait = Config.MAX_RETRY_RERIOD_MILLIS;
         }
-        viewContext.logger().debug(TAG, "Central server is working well. Next retry-check after " + wait + "millis");
+        LOG.debug("Central server is working well. Next retry-check after " + wait + "millis");
         retryTask.schedule(new RetryTimerTask(next, 0), wait);
         return;
       }
@@ -146,7 +146,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       long wait = retryCount * (long) Math.pow(2, retryCount) * 1000 + Config.MIN_RETRY_RERIOD_MILLIS;
       wait = wait <= Config.MAX_RETRY_RERIOD_MILLIS ? wait : Config.MAX_RETRY_RERIOD_MILLIS;
       Session session = Sessions.getSession();
-      viewContext.logger().debug(TAG, "Central server seems to stop. Wait for re-sending the message " + session + " for " + wait + "millis");
+      LOG.debug("Central server seems to stop. Wait for re-sending the message " + session + " for " + wait + "millis");
 
       prev.context.writeAndFlush(prev.message);
       retryTask.schedule(new RetryTimerTask(prev, retryCount + 1), wait);
@@ -160,7 +160,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     if (message == Markers.AGAIN) {
       ChannelFuture againFuture = sendFromQueue();
       if (againFuture == null) {
-        viewContext.logger().warn(TAG, "Central Server request sending a message again, but the client doesn't have any message...");
+        LOG.debug("Central Server request sending a message again, but the client doesn't have any message...");
         promise.setSuccess();
       }
       againFuture.addListener(new ChannelFutureListener() {
@@ -195,7 +195,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       if (Sessions.getSession().isNotAssigned()) {
         lastPossiblyDiscardedMessage = new MessageAndContext(message, ctx);
         // Currently the client is working on connecting with central server.
-        viewContext.logger().warn(TAG, "Discarded the message" + message + " since the session has not been created yet.");
+        LOG.debug("Discarded the message" + message + " since the session has not been created yet.");
         ctx.write(Markers.ASSIGN_AID);
         return;
       } else {

@@ -12,6 +12,7 @@ import android.text.SpannableStringBuilder;
 import android.text.TextWatcher;
 import android.text.style.BackgroundColorSpan;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
@@ -77,6 +78,7 @@ public class NewMessageFragment extends Fragment {
         // Since the activity is using android:windowSoftInputMode="adjustPan",
         // The fragment needs to resize itself when a software keyboard is shown.
         final ScrollView scrollView = (ScrollView) editText.getParent();
+        final View footer = view.findViewById(R.id.new_message_footer);
         view.getViewTreeObserver().addOnGlobalLayoutListener(
                 new ViewTreeObserver.OnGlobalLayoutListener() {
                     int defaultBottomPadding = -1;
@@ -93,9 +95,27 @@ public class NewMessageFragment extends Fragment {
                         }
                         int bottom = visibleSize.bottom - defaultBottomPadding;
                         scrollView.setBottom(bottom);
+                        footer.setTop(bottom - footer.getHeight());
                     }
                 });
         editText.setSelection(editText.length());
+
+        View.OnTouchListener touchListener = new View.OnTouchListener() {
+            private float downY;
+
+            @Override
+            public boolean onTouch(View view, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                    downY = event.getY();
+                } else if (event.getAction() == MotionEvent.ACTION_UP
+                        && Math.abs(downY - event.getY()) < 5) {
+                    toggleSoftInput(true);
+                }
+                return scrollView.onTouchEvent(event);
+            }
+        };
+        scrollView.setOnTouchListener(touchListener);
+
         return view;
     }
 
@@ -112,6 +132,8 @@ public class NewMessageFragment extends Fragment {
             }
         }
         onEdit(editText.getText().subSequence(0, editText.length()), 0, -1);
+        androidContext.getActivity().showToolbar();
+        toggleSoftInput(true);
     }
 
     private boolean hasContent(CharSequence s) {
@@ -170,8 +192,14 @@ public class NewMessageFragment extends Fragment {
     @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
-        if (hidden) {
-            InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+        toggleSoftInput(!hidden);
+    }
+
+    private void toggleSoftInput(boolean show) {
+        InputMethodManager imm = (InputMethodManager) getActivity().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (show) {
+            imm.showSoftInput(editText, 0);
+        } else {
             imm.hideSoftInputFromWindow(editText.getWindowToken(), 0);
         }
     }

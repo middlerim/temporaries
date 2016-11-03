@@ -46,7 +46,7 @@ public class CentralServer {
         // In
         new PacketToInboundDecoder(viewContext), new InboundHandler(),
         // Out
-        new OutboundHandler(), new OutboundSynchronizer(viewContext)};
+        new OutboundHandler(), new OutboundSynchronizer()};
   }
 
   public static ChannelFuture run(ViewContext viewContext) {

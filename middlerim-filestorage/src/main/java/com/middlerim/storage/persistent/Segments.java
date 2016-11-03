@@ -61,7 +61,7 @@ class Segments<L extends Persistent<L>> implements Closeable {
     int chIndex = channelIndex(id);
     FileChannel fc = fcs[chIndex];
     if (fc == null) {
-      File dir = info.path().toFile();
+      File dir = info.storage();
       if (!dir.exists()) {
         if (!createIfNot) {
           return null;

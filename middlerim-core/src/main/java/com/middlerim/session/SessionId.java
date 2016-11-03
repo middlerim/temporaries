@@ -14,7 +14,6 @@ public final class SessionId {
   public static final int ANONYMOUS_USER_TO = 2_000_000_000;
 
   private final int userId; // 0 < MAX_USER_SIZE
-  private final int hashCode;
   private byte clientSequenceNo; // Byte.MIN < Byte.MAX
   private short serverSequenceNo; // Short.MIN < Short.MAX
 
@@ -23,7 +22,6 @@ public final class SessionId {
       throw new IllegalArgumentException();
     }
     this.userId = (int) id;
-    this.hashCode = userId;
 
     // Assign random sequence no at first to prevent invalid access.
     while (true) {
@@ -45,7 +43,6 @@ public final class SessionId {
         (((long) n[1] & 0xff) << 16) |
         (((long) n[2] & 0xff) << 8) |
         (((long) n[3] & 0xff)));
-    this.hashCode = (int) (userId ^ (userId >>> 32));
     // n[4] is reserved.
     this.clientSequenceNo = n[5];
     this.serverSequenceNo = (short) ((n[6] << 8) | (n[7] & 0xff));
@@ -131,7 +128,7 @@ public final class SessionId {
 
   @Override
   public int hashCode() {
-    return hashCode;
+    return userId;
   }
 
   @Override

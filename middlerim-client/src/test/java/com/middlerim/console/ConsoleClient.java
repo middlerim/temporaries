@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.InputStreamReader;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -15,7 +14,6 @@ import java.util.concurrent.TimeoutException;
 import com.middlerim.client.CentralEvents;
 import com.middlerim.client.CentralServer;
 import com.middlerim.client.Config;
-import com.middlerim.client.view.Logger;
 import com.middlerim.client.view.MessagePool;
 import com.middlerim.client.view.ViewContext;
 import com.middlerim.client.view.ViewEvents;
@@ -51,36 +49,18 @@ public class ConsoleClient {
       return msg;
     }
     @Override
-    public Path storagePath() {
-      return Paths.get("./", "db_test");
+    public File storage() {
+      return Paths.get("./", "db_test").toFile();
     }
   };
 
-  private static MessagePool<Message> messagePool = new MessagePool<>(messagePoolAdaptor);
-
-  private static class ConsoleLogger implements Logger {
-    @Override
-    public void warn(String tag, String message) {
-      System.out.println("[" + tag + "] WARN " + message);
-    }
-
-    @Override
-    public void debug(String tag, String message) {
-      System.out.println("[" + tag + "] DEBUG " + message);
-    }
-  }
+  private static MessagePool<Message> messagePool = new MessagePool<>(messagePoolAdaptor).startListen();
 
   public static class ConsoleContext extends ViewContext {
-    private final ConsoleLogger logger = new ConsoleLogger();
     private final File tmpDir = new File(".");
     @Override
     public File getCacheDir() {
       return tmpDir;
-    }
-
-    @Override
-    public Logger logger() {
-      return logger;
     }
 
     @Override

@@ -40,6 +40,10 @@ public class MainFragment extends Fragment implements ButtonQueueManager.Adopter
         return view;
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+    }
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {

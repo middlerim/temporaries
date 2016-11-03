@@ -12,8 +12,11 @@ import android.support.v4.app.ActivityCompat;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.location.Coordinate;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class LocationTracker {
-    private static final String TAG = Middlerim.TAG + ".LOCTRAC";
+    private static final Logger LOG = LoggerFactory.getLogger(LocationTracker.class);
 
     private static final int LOCATION_INTERVAL_FG = 5000;
     private static final float LOCATION_DISTANCE_FG = 200f;
@@ -61,7 +64,7 @@ public class LocationTracker {
         this.isForeground = isForeground;
         stop();
         initLocationManager();
-        androidContext.logger().debug(TAG, "Changed to " + (isForeground ? "forground" : "background") + " mode.");
+        LOG.debug("Changed to " + (isForeground ? "forground" : "background") + " mode.");
     }
 
     public void start(final AndroidContext androidContext, final boolean isForeground) {

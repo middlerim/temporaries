@@ -9,5 +9,7 @@ dependencies {
     compile project(':middlerim-core')
     compile project(':middlerim-filestorage')
     compile "io.netty:netty-handler:${nettyVersion}"
+    compile 'org.slf4j:slf4j-api:1.7.21'
+    compile 'ch.qos.logback:logback-classic:1.1.5'
     testCompile 'junit:junit:4.12'
 }

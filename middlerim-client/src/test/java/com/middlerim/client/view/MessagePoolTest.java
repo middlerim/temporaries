@@ -6,7 +6,6 @@ import static org.junit.Assert.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +19,7 @@ import com.middlerim.location.Coordinate;
 
 public class MessagePoolTest {
 
-  private static final Path tmpDir = Paths.get("./", "db_test");
+  private static final File tmpDir = Paths.get("./", "db_test").toFile();
 
   private static class Entry {
     long userId;
@@ -57,7 +56,7 @@ public class MessagePoolTest {
       return entry;
     }
     @Override
-    public Path storagePath() {
+    public File storage() {
       return tmpDir;
     }
   };
@@ -77,16 +76,15 @@ public class MessagePoolTest {
 
   @Before
   public void before() throws IOException {
-    File f = tmpDir.toFile();
-    for (String s : f.list()) {
-      File currentFile = new File(f.getPath(), s);
+    for (String s : tmpDir.list()) {
+      File currentFile = new File(tmpDir, s);
       currentFile.delete();
     }
   }
 
   @Test
   public void testEmptyPool() {
-    MessagePool<Entry> pool = new MessagePool<>(1, messagePoolAdapter);
+    MessagePool<Entry> pool = new MessagePool<>(1, messagePoolAdapter).startListen();
     Entry entry = pool.get(0);
     assertNull(entry);
   }
@@ -94,7 +92,7 @@ public class MessagePoolTest {
   @Test
   public void testOnReceiveNewMessage() {
     int capacity = 3;
-    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter).startListen();
     for (int i = 0; i < capacity * 3; i++) {
       Entry expect = fireReceiveMessage();
       Entry entry = pool.get(i);
@@ -113,7 +111,7 @@ public class MessagePoolTest {
   @Test
   public void testOnRemove() {
     int capacity = 3;
-    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter).startListen();
     pool.onRemoved(new MessagePool.RemovedListener<Entry>() {
       @Override
       public void onRemoved(int index, Entry entry) {
@@ -145,7 +143,7 @@ public class MessagePoolTest {
   @Test
   public void testReadOldMessage_samePool() throws InterruptedException {
     int capacity = 2;
-    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter).startListen();
     List<Entry> expects = new ArrayList<>();
     for (int i = 0; i < capacity; i++) {
       expects.add(fireReceiveMessage());
@@ -162,7 +160,7 @@ public class MessagePoolTest {
   @Test
   public void testReadOldMessage_newPool_full() throws InterruptedException {
     int capacity = 3;
-    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter).startListen();
     List<Entry> expects = new ArrayList<>();
     for (int i = 0; i < 5; i++) {
       expects.add(fireReceiveMessage());
@@ -170,7 +168,7 @@ public class MessagePoolTest {
 
     Thread.sleep(100);
     int size = pool.size();
-    pool = new MessagePool<>(capacity, messagePoolAdapter);
+    pool = new MessagePool<>(capacity, messagePoolAdapter).startListen();
     pool.loadLatestMessages(size);
     assertThat(pool.size(), is(3));
     for (int i = 0; i < capacity; i++) {
@@ -182,7 +180,7 @@ public class MessagePoolTest {
   @Test
   public void testReadOldMessage_newPool() throws InterruptedException {
     int capacity = 3;
-    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter);
+    MessagePool<Entry> pool = new MessagePool<>(capacity, messagePoolAdapter).startListen();
     List<Entry> expects = new ArrayList<>();
     for (int i = 0; i < 2; i++) {
       expects.add(fireReceiveMessage());
@@ -190,7 +188,7 @@ public class MessagePoolTest {
 
     Thread.sleep(100);
     int size = pool.size();
-    pool = new MessagePool<>(capacity, messagePoolAdapter);
+    pool = new MessagePool<>(capacity, messagePoolAdapter).startListen();
     pool.loadLatestMessages(size);
     assertThat(pool.size(), is(2));
     for (int i = 0; i < 2; i++) {

@@ -57,12 +57,18 @@ public class End2EndTest {
         latch.countDown();
       }
     }, "CentralServer").run();
-    CentralServer.run(ctx).addListener(new ChannelFutureListener() {
+    new Thread(new Runnable() {
+
       @Override
-      public void operationComplete(ChannelFuture future) throws Exception {
-        latch.countDown();
+      public void run() {
+        CentralServer.run(ctx).addListener(new ChannelFutureListener() {
+          @Override
+          public void operationComplete(ChannelFuture future) throws Exception {
+            latch.countDown();
+          }
+        });
       }
-    });
+    }, "Client").run();
     latch.await();
 
     CentralEvents.onReceiveMessage("End2EndTest.CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>", new CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>() {
@@ -184,7 +190,7 @@ public class End2EndTest {
 
   private void updateLocation(Coordinate location) throws InterruptedException {
     ViewEvents.fireLocationUpdate(location);
-    Thread.sleep(20);
+    Thread.sleep(500);
   }
 
   private void sendMessage(byte messageCommand) throws InterruptedException {
@@ -318,7 +324,7 @@ public class End2EndTest {
     // TODO
     Session session = Sessions.getSession();
   }
-  
+
   @Test
   public void testExit() throws InterruptedException {
     updateLocation(MARUNOUCHI_2_4_1_TOKYO);

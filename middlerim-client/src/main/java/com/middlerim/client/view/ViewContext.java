@@ -6,7 +6,5 @@ public abstract class ViewContext {
 
   public abstract File getCacheDir();
 
-  public abstract Logger logger();
-
   public abstract boolean isDebug();
 }

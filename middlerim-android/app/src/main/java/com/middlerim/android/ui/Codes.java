@@ -15,4 +15,5 @@ final class Codes {
     public static final String PREF_EDITING_MESSAGE = "EDITING_MESSAGE";
     public static final String PREF_AREA_PROGRESS = "AREA_PROGRESS";
     public static final String PREF_AREA_RADIUS = "AREA_RADIUS";
+    public static final String PREF_LATEST_MESSAGE_SIZE = "LATEST_MESSAGE_SIZE";
 }

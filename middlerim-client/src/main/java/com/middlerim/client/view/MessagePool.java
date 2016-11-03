@@ -1,9 +1,13 @@
 package com.middlerim.client.view;
 
+import java.io.Closeable;
+import java.io.File;
 import java.nio.ByteBuffer;
-import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.middlerim.Config;
 import com.middlerim.client.CentralEvents;
@@ -11,14 +15,16 @@ import com.middlerim.client.session.Sessions;
 import com.middlerim.location.Coordinate;
 import com.middlerim.location.Point;
 import com.middlerim.session.Session;
+import com.middlerim.session.SessionId;
 import com.middlerim.storage.persistent.FixedLayoutPersistentStorage;
 import com.middlerim.storage.persistent.Persistent;
 import com.middlerim.storage.persistent.StorageInformation;
 
-public class MessagePool<T> {
+public class MessagePool<T> implements Closeable {
+  private static final Logger LOG = LoggerFactory.getLogger(MessagePool.class);
   public interface Adapter<T> {
     T onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery);
-    Path storagePath();
+    File storage();
   }
 
   public interface RemovedListener<T> {
@@ -70,11 +76,10 @@ public class MessagePool<T> {
     this.storage = new FixedLayoutPersistentStorage<Message>(
         new StorageInformation<Message>("msgpool", Message.MAX_RECORD_SIZE, Message.MAX_RECORD_SIZE * capacity, Message.MAX_RECORD_SIZE * capacity) {
           @Override
-          public Path path() {
-            return MessagePool.this.adapter.storagePath();
+          public File storage() {
+            return MessagePool.this.adapter.storage();
           }
         });
-    startListen();
   }
 
   public MessagePool(Adapter<T> aaptor) {
@@ -124,32 +129,44 @@ public class MessagePool<T> {
     this.removedListener = listener;
   }
 
-  public void startListen() {
+  public MessagePool<T> startListen() {
     if (listening) {
-      return;
+      return this;
     }
     listening = true;
     CentralEvents.onReceivedText("MessagePool.receivedTextListener", receivedTextListener);
     CentralEvents.onReceiveMessage("MessagePool.receiveMessageListener", receiveMessageListener);
     CentralEvents.onSendMessage("MessagePool.sendMessageListener", sendMessageListener);
+    return this;
   }
 
-  public void stopListen() {
+  @Override
+  public void close() {
+    storage.close();
+  }
+
+  public MessagePool<T> stopListen() {
     listening = false;
     CentralEvents.removeListener("MessagePool.receivedTextListener");
     CentralEvents.removeListener("MessagePool.receiveMessageListener");
     CentralEvents.removeListener("MessagePool.sendMessageListener");
+    return this;
   }
 
-  public void loadLatestMessages(int size) {
+  public boolean loadLatestMessages(int size) {
     int begin = size < capacity ? 0 : size % capacity;
     int end = size < capacity ? size : begin + capacity;
     for (int i = begin; i < end; i++) {
       int id = i > capacity ? i - capacity : i;
       Message message = new Message(id);
       message = storage.get(message.index, message);
+      if (message.userId == SessionId.UNASSIGNED_USERID) {
+        LOG.warn("Could not read a message cache from file storage.");
+        return false;
+      }
       addLast(adapter.onReceive(message.userId, message.location, new String(message.displayName, Config.MESSAGE_ENCODING), ByteBuffer.wrap(message.message), message.numberOfDelivery));
     }
+    return true;
   }
 
   private static class Message implements Persistent<Message> {
@@ -189,11 +206,18 @@ public class MessagePool<T> {
 
     @Override
     public void read(ByteBuffer buf) {
-      Point point = location.toPoint();
+      buf.putLong(userId);
+      if (location != null) {
+        Point point = location.toPoint();
+        buf
+            .putInt(point.latitude)
+            .putInt(point.longitude);
+      } else {
+        buf
+            .putInt(0)
+            .putInt(0);
+      }
       buf
-          .putLong(userId)
-          .putInt(point.latitude)
-          .putInt(point.longitude)
           .putInt(numberOfDelivery)
           .putInt(displayName.length)
           .put(displayName)

@@ -4,14 +4,11 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.support.v4.app.FragmentActivity;
 
-import com.middlerim.client.view.Logger;
 import com.middlerim.client.view.ViewContext;
 
 import java.io.File;
 
 class AndroidContext extends ViewContext {
-
-    private static final Logger logger = new AndroidLogger();
 
     private Context ctx;
     private ButtonQueueManager buttonQueueManager;
@@ -68,11 +65,6 @@ class AndroidContext extends ViewContext {
     @Override
     public File getCacheDir() {
         return ctx.getCacheDir();
-    }
-
-    @Override
-    public Logger logger() {
-        return logger;
     }
 
     public SharedPreferences preferences() {

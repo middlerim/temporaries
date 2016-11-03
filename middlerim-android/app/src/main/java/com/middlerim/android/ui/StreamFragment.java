@@ -2,10 +2,6 @@ package com.middlerim.android.ui;
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.content.res.TypedArray;
-import android.graphics.Canvas;
-import android.graphics.Rect;
-import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -14,8 +10,8 @@ import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.SpannableStringBuilder;
+import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
@@ -25,6 +21,7 @@ import com.middlerim.client.Config;
 import com.middlerim.client.view.MessagePool;
 import com.middlerim.location.Coordinate;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.text.NumberFormat;
 
@@ -96,7 +93,38 @@ public class StreamFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         androidContext = AndroidContext.get(getActivity());
-        messagePool = new MessagePool<>(10, messagePoolAdapter);
+        messagePool = new MessagePool<>(10, new MessagePool.Adapter<Message>() {
+            @Override
+            public Message onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
+                byte[] bs = new byte[message.remaining()];
+                message.get(bs);
+                SpannableStringBuilder sb = new SpannableStringBuilder(new String(bs, Config.MESSAGE_ENCODING));
+                Message msg = new Message(userId, location, displayName, sb, numberOfDelivery);
+
+                if (pauseAt == ACTIVE) {
+                    scrollTo(messagePool.size());
+                }
+                return msg;
+            }
+
+            @Override
+            public File storage() {
+                return new File(getContext().getFilesDir(), "messages");
+            }
+        });
+        int latestMessageSize = androidContext.preferences().getInt(Codes.PREF_LATEST_MESSAGE_SIZE, -1);
+        if (latestMessageSize >= 0) {
+            messagePool.loadLatestMessages(latestMessageSize);
+        }
+        messagePool.startListen();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        messagePool.stopListen();
+        androidContext.preferences().edit().putInt(Codes.PREF_LATEST_MESSAGE_SIZE, messagePool.size()).apply();
+        messagePool.close();
     }
 
     @Override
@@ -137,21 +165,6 @@ public class StreamFragment extends Fragment {
             }
         });
     }
-
-    private final MessagePool.Adapter<Message> messagePoolAdapter = new MessagePool.Adapter<Message>() {
-        @Override
-        public Message onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
-            byte[] bs = new byte[message.remaining()];
-            message.get(bs);
-            SpannableStringBuilder sb = new SpannableStringBuilder(new String(bs, Config.MESSAGE_ENCODING));
-            Message msg = new Message(userId, location, displayName, sb, numberOfDelivery);
-
-            if (pauseAt == ACTIVE) {
-                scrollTo(messagePool.size());
-            }
-            return msg;
-        }
-    };
 
     public static class Message {
         private static NumberFormat numberFormat = NumberFormat.getIntegerInstance();

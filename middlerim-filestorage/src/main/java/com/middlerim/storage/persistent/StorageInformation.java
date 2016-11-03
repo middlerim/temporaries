@@ -1,7 +1,6 @@
 package com.middlerim.storage.persistent;
 
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.io.File;
 
 import com.middlerim.Config;
 
@@ -35,7 +34,7 @@ public class StorageInformation<L extends Persistent<L>> {
     return segmentSize;
   }
 
-  public Path path() {
-    return Paths.get("./", Config.TEST ? "db_test" : "db", "s_" + storageId);
+  public File storage() {
+    return new File(Config.TEST ? "./db_test" : "./db", "s_" + storageId);
   }
 }

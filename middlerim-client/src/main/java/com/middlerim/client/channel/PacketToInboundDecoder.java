@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import com.middlerim.client.CentralEvents;
 import com.middlerim.client.message.Markers;
 import com.middlerim.client.message.MessageLost;
@@ -29,7 +32,7 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.MessageToMessageDecoder;
 
 public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPacket> {
-  private static final String NAME = "CHANNEL";
+  private static final Logger LOG = LoggerFactory.getLogger(PacketToInboundDecoder.class);
   private static Map<Session, ByteBuffer> fragmentedBufferMap = new ConcurrentHashMap<>();
   private final ViewContext viewContext;
 
@@ -49,7 +52,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       if (!Sessions.getSession().isNotAssigned()) {
         // Already assigned. It happens because it's not synchronizing while ASSIGN_AID is being requested.
         if (viewContext.isDebug()) {
-          viewContext.logger().debug(NAME, "Packet[ASSGIN_AID]: Ignored since annonymous ID has been assinged already.");
+          LOG.debug("Packet[ASSGIN_AID]: Ignored since annonymous ID has been assinged already.");
         }
         return;
       }
@@ -58,7 +61,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
       Sessions.setSession(Session.create(sessionId, Sessions.getSession().address));
       if (viewContext.isDebug()) {
-        viewContext.logger().debug(NAME, "Packet[ASSGIN_AID]: Received new anonymous session ID." + sessionId);
+        LOG.debug("Packet[ASSGIN_AID]: Received new anonymous session ID." + sessionId);
       }
       CentralEvents.fireReceived(SessionId.UNASSIGNED_SEQUENCE_NO);
       return;
@@ -67,7 +70,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     Session session = Sessions.getSession();
     if (session == null || !session.address.equals(msg.sender())) {
       // sender address must be same to prevent malicious packet.
-      viewContext.logger().warn(NAME, "Access from unknown address: " + msg.sender() + ", current session is " + session);
+      LOG.warn("Access from unknown address: " + msg.sender() + ", current session is " + session);
       return;
     }
 
@@ -75,7 +78,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       // Synchronize sequenceNo on the client with central server.
       byte clientSequenceNo = in.readByte();
       if (viewContext.isDebug()) {
-        viewContext.logger().debug(NAME, "Packet[AGAIN]:  clientSequenceNo on central server=" + clientSequenceNo + ", on the client=" + session.sessionId.clientSequenceNo());
+        LOG.debug("Packet[AGAIN]:  clientSequenceNo on central server=" + clientSequenceNo + ", on the client=" + session.sessionId.clientSequenceNo());
       }
       session.sessionId.synchronizeClientWithServer(clientSequenceNo);
       out.add(Markers.AGAIN);
@@ -85,13 +88,13 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (Headers.isMasked(header, Headers.RECEIVED)) {
       byte clientSequenceNo = in.readByte();
       if (viewContext.isDebug()) {
-        viewContext.logger().debug(NAME, "Packet[RECEIVED]: " + clientSequenceNo);
+        LOG.debug("Packet[RECEIVED]: " + clientSequenceNo);
       }
       CentralEvents.fireReceived(clientSequenceNo);
       if (Headers.isMasked(header, Headers.TEXT)) {
         int numberOfDelivery = in.readInt();
         if (viewContext.isDebug()) {
-          viewContext.logger().debug(NAME, "Packet[RECEIVED&TEXT]: " + numberOfDelivery);
+          LOG.debug("Packet[RECEIVED&TEXT]: " + numberOfDelivery);
         }
         CentralEvents.fireReceivedText(clientSequenceNo, numberOfDelivery);
       }
@@ -101,7 +104,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (!session.sessionId.validateServerSequenceNoAndRefresh(serverSequenceNo)) {
       // Messages from server can be asynchronous. However, some messages are lost and will be requested.
       if (viewContext.isDebug()) {
-        viewContext.logger().warn(NAME, "Invalid sequenceNo: " + (short) (session.sessionId.serverSequenceNo() + 1) + " != " + serverSequenceNo);
+        LOG.debug("Invalid sequenceNo: " + (short) (session.sessionId.serverSequenceNo() + 1) + " != " + serverSequenceNo);
       }
       ctx.channel().write(new MessageLost(session.sessionId.serverSequenceNo(), serverSequenceNo));
     }
@@ -111,7 +114,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       int paylaadSize = in.readInt();
       int offset = in.readInt();
       if (viewContext.isDebug()) {
-        viewContext.logger().debug(NAME, "Packet[FRAGMENT]: " + offset + "/" + paylaadSize);
+        LOG.debug("Packet[FRAGMENT]: " + offset + "/" + paylaadSize);
       }
       consumePayload(session, paylaadSize, offset, in);
       return;
@@ -131,11 +134,11 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
         byte displayNameLength = buff.get();
         byte messageCommand = buff.get();
         if (buff.remaining() <= displayNameLength) {
-          viewContext.logger().warn(NAME, "Received insufficient data. data length need at least " + displayNameLength + " but actually it's " + buff.remaining());
+          LOG.warn("Received insufficient data. data length need at least " + displayNameLength + " but actually it's " + buff.remaining());
           return;
         }
         if (viewContext.isDebug()) {
-          viewContext.logger().debug(NAME, "Packet[TEXT]: " + buff);
+          LOG.debug("Packet[TEXT]: " + buff);
         }
         out.add(new Text.In(Bytes.intToLong(userIdBytes), new Point(latitude, longtitude).toCoordinate(), displayNameLength, messageCommand, buff.slice()));
       }

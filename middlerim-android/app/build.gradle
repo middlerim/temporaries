@@ -44,6 +44,8 @@ dependencies {
     compile 'com.android.support:support-vector-drawable:25.0.0'
     compile 'com.android.support:preference-v7:25.0.0'
     compile 'com.middlerim:middlerim-client:0.3'
+    compile 'com.middlerim:middlerim-filestorage:0.3'
+    compile 'org.slf4j:slf4j-android:1.7.21'
     testCompile 'junit:junit:4.12'
 }
 

@@ -56,14 +56,14 @@ public final class Markers {
 
   private static final class InvalidData implements Outbound {
 
-    private static final int FIXED_BYTE_SIZE = 2;
+    private static final int FIXED_BYTE_SIZE = 1;
 
     private InvalidData() {
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeByte(recipient.sessionId.clientSequenceNo()), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ERROR), recipient.address));
     }
 
     @Override
