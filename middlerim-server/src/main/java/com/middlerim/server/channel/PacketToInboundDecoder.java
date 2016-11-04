@@ -113,6 +113,13 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     }
     Session session = Sessions.getOrCreateSession(sessionId, msg.sender());
     LOG.debug("Session for the packet: {}", session);
+    if (!session.sessionId.equals(sessionId)) {
+      session.sessionId.synchronizeClientWithServer((byte) (sessionId.clientSequenceNo() - 1));
+      LOG.debug("Session is removed. Assigned new session: {}", session);
+      ctx.channel().write(new OutboundMessage<>(session, Markers.UPDATE_AID));
+      return;
+    }
+
     ctx.channel().attr(AttributeKeys.SESSION).set(session);
 
     if (Headers.isMasked(header, Headers.LOCATION)) {
@@ -125,7 +132,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       }
       Point point = new Point(latitude, longtitude);
       LOG.debug("Packet[LOCATION] - {}: {}", session, point);
-      out.add(new Location(point));
+      out.add(new Location(session.sessionId, point));
       return;
     }
     if (!session.sessionId.validateClientAndRefresh(sessionId)) {
@@ -205,6 +212,11 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       @Override
       public void onRemove(Session session) {
         fragmentedBufferMap.remove(session);
+      }
+
+      @Override
+      public void onExpire(Session oldSession, Session newSession) {
+        onRemove(oldSession);
       }
     });
   }

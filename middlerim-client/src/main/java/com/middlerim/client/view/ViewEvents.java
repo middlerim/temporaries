@@ -25,7 +25,7 @@ public final class ViewEvents {
   public static void removeListener(String name) {
     Listener<?> listener = listeneres.remove(name);
     if (listener == null) {
-      throw new IllegalStateException(name + " hasn't been added.");
+      return;
     }
     createListeners.remove(listener);
     locationUpdateListeners.remove(listener);

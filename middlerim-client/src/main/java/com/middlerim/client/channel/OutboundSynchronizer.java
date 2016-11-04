@@ -23,16 +23,16 @@ import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 
 public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
-  private static final Logger LOG = LoggerFactory.getLogger(OutboundSynchronizer.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
 
   // Queue for sequential messages.
-  static final ArrayDeque<MessageAndContext> MESSAGE_QUEUE = new ArrayDeque<>(Config.MAX_MESSAGE_QUEUE);
+  static final ArrayDeque<MessageAndContext<SequentialMessage>> MESSAGE_QUEUE = new ArrayDeque<>(Config.MAX_MESSAGE_QUEUE);
+  private final long startTimeMillis = System.currentTimeMillis();
 
-  private Timer retryTask;
+  private Timer retryTimer;
   private long totalMsgSent = 1;
-  private long startTimeMillis = System.currentTimeMillis();
   private boolean working;
-  private MessageAndContext lastPossiblyDiscardedMessage;
+  private MessageAndContext<Outbound> lastPossiblyDiscardedMessage;
 
   public OutboundSynchronizer() {
     initializeEventHandlers();
@@ -54,19 +54,19 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     ViewEvents.onResume("OutboundSynchronizer.ViewEvents.Listener<ViewEvents.ResumeEvent>", new ViewEvents.Listener<ViewEvents.ResumeEvent>() {
       @Override
       public void handle(ViewEvents.ResumeEvent event) {
-        if (retryTask != null) {
-          retryTask.cancel();
+        if (retryTimer != null) {
+          retryTimer.cancel();
         }
-        retryTask = new Timer(Config.INTERNAL_APP_NAME + "-sync", true);
-        retryTask.schedule(new RetryTimerTask(MESSAGE_QUEUE.peek(), 0), Config.MIN_RETRY_RERIOD_MILLIS);
+        retryTimer = new Timer(Config.INTERNAL_APP_NAME + "-sync", true);
+        retryTimer.schedule(new RetryTimerTask(MESSAGE_QUEUE.peek(), 0), Config.MIN_RETRY_RERIOD_MILLIS);
       }
     });
     ViewEvents.onPause("OutboundSynchronizer.ViewEvents.Listener<ViewEvents.PauseEvent>", new ViewEvents.Listener<ViewEvents.PauseEvent>() {
       @Override
       public void handle(ViewEvents.PauseEvent event) {
-        if (retryTask != null) {
-          retryTask.cancel();
-          retryTask = null;
+        if (retryTimer != null) {
+          retryTimer.cancel();
+          retryTimer = null;
         }
       }
     });
@@ -80,7 +80,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
   }
 
   private ChannelFuture sendFromQueue() {
-    MessageAndContext next = MESSAGE_QUEUE.peek();
+    MessageAndContext<SequentialMessage> next = MESSAGE_QUEUE.peek();
     if (next == null) {
       return null;
     }
@@ -96,10 +96,10 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
   }
 
   private class RetryTimerTask extends TimerTask {
-    private final MessageAndContext prev;
+    private final MessageAndContext<SequentialMessage> prev;
     private final int retryCount;
 
-    RetryTimerTask(MessageAndContext prev, int retryCount) {
+    RetryTimerTask(MessageAndContext<SequentialMessage> prev, int retryCount) {
       this.prev = prev;
       this.retryCount = retryCount;
     }
@@ -109,7 +109,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       if (session != null && !session.isNotAssigned()) {
         return true;
       }
-      MessageAndContext mc = prev;
+      MessageAndContext<SequentialMessage> mc = prev;
       if (mc == null) {
         mc = MESSAGE_QUEUE.peek();
       }
@@ -126,10 +126,10 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     @Override
     public void run() {
       if (!ensureNotAnonymous()) {
-        retryTask.schedule(new RetryTimerTask(prev, retryCount + 1), Config.MIN_RETRY_RERIOD_MILLIS);
+        retryTimer.schedule(new RetryTimerTask(prev, retryCount + 1), Config.MIN_RETRY_RERIOD_MILLIS);
         return;
       }
-      MessageAndContext next = MESSAGE_QUEUE.peek();
+      MessageAndContext<SequentialMessage> next = MESSAGE_QUEUE.peek();
       if (prev == null || prev != next) {
         long wait = averageMessageSentMillis();
         if (wait < Config.MIN_RETRY_RERIOD_MILLIS) {
@@ -138,7 +138,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
           wait = Config.MAX_RETRY_RERIOD_MILLIS;
         }
         LOG.debug("Central server is working well. Next retry-check after " + wait + "millis");
-        retryTask.schedule(new RetryTimerTask(next, 0), wait);
+        retryTimer.schedule(new RetryTimerTask(next, 0), wait);
         return;
       }
       // Retry
@@ -149,7 +149,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       LOG.debug("Central server seems to stop. Wait for re-sending the message " + session + " for " + wait + "millis");
 
       prev.context.writeAndFlush(prev.message);
-      retryTask.schedule(new RetryTimerTask(prev, retryCount + 1), wait);
+      retryTimer.schedule(new RetryTimerTask(prev, retryCount + 1), wait);
     }
   }
 
@@ -183,7 +183,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       }
       boolean added;
       synchronized (MESSAGE_QUEUE) {
-        added = MESSAGE_QUEUE.offer(new MessageAndContext(message, ctx));
+        added = MESSAGE_QUEUE.offer(new MessageAndContext<>((SequentialMessage) message, ctx));
       }
       if (!added) {
         CentralEvents.fireLostMessage((SequentialMessage) message, CentralEvents.LostMessageEvent.Type.LIMIT);
@@ -193,14 +193,14 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       return;
     } else {
       if (Sessions.getSession().isNotAssigned()) {
-        lastPossiblyDiscardedMessage = new MessageAndContext(message, ctx);
+        lastPossiblyDiscardedMessage = new MessageAndContext<>(message, ctx);
         // Currently the client is working on connecting with central server.
         LOG.debug("Discarded the message" + message + " since the session has not been created yet.");
         ctx.write(Markers.ASSIGN_AID);
         return;
       } else {
         if (!working) {
-          lastPossiblyDiscardedMessage = new MessageAndContext(message, ctx);
+          lastPossiblyDiscardedMessage = new MessageAndContext<>(message, ctx);
         }
         ctx.writeAndFlush(message);
         return;
@@ -213,11 +213,15 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     return true;
   }
 
-  private static final class MessageAndContext {
-    final Outbound message;
+  public static ArrayDeque<MessageAndContext<SequentialMessage>> getMessageQueue() {
+    return MESSAGE_QUEUE.clone();
+  }
+
+  public static final class MessageAndContext<M> {
+    public final M message;
     final ChannelHandlerContext context;
 
-    MessageAndContext(Outbound message, ChannelHandlerContext context) {
+    MessageAndContext(M message, ChannelHandlerContext context) {
       this.message = message;
       this.context = context;
     }

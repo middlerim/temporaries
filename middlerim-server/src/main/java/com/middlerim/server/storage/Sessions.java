@@ -52,19 +52,30 @@ public final class Sessions {
     timer.schedule(new TimerTask() {
       @Override
       public void run() {
-        long currentTimeMillis = System.currentTimeMillis();
-        while (true) {
-          Session last = sessionQueue.peek();
-          if (last == null) {
-            return;
+        try {
+          long currentTimeMillis = System.currentTimeMillis();
+          while (true) {
+            Session last = sessionQueue.peek();
+            if (last == null) {
+              return;
+            }
+            if (last.lastAccessTimeMillis - last.createdTimeMillis > Config.SESSIONID_RENEW_CYCLE_MILLIS) {
+              LOG.debug("The session {} is using the session ID for a long time. It's time to assign a new session ID.", last);
+              sessionQueue.poll();
+              synchronized (sessionMap) {
+                sessionMap.remove(last.sessionId);
+              }
+              expire(last, getOrCreateSession(last.sessionId, last.address));
+            } else if (last.lastAccessTimeMillis + Config.SESSION_TIMEOUT_MILLIS <= currentTimeMillis) {
+              LOG.info("Session timeout: {}", last);
+              sessionQueue.poll();
+              remove(last);
+            } else {
+              return;
+            }
           }
-          if (last.lastAccessTimeMillis + Config.SESSION_TIMEOUT_MILLIS <= currentTimeMillis) {
-            LOG.info("Session timeout: {}", last);
-            sessionQueue.poll();
-            remove(last);
-          } else {
-            return;
-          }
+        } catch (Exception e) {
+          LOG.error("Unexpected exception", e);
         }
       }
     }, Config.SESSION_TIMEOUT_MILLIS, Config.SESSION_TIMEOUT_MILLIS / 2);
@@ -95,9 +106,11 @@ public final class Sessions {
     synchronized (sessionMap) {
       Session session = sessionId != null ? sessionMap.get(sessionId) : null;
       if (session == null) {
-        if (sessionId == null || sessionId.userId() != SessionId.UNASSIGNED_USERID) {
-          // Session is new or removed. Don't accept reuse old session ID.Assign new session ID.
+        if (sessionId == null) {
           sessionId = createAnonymousSessionId();
+        } else if (sessionId.userId() != SessionId.UNASSIGNED_USERID) {
+          // Session is new or removed. Don't accept reuse old session ID.Assign new session ID.
+          sessionId = assignNewSessionId(sessionId);
         }
         session = Session.create(sessionId, address);
         sessionMap.put(sessionId, session);
@@ -128,8 +141,21 @@ public final class Sessions {
     }
   }
 
+  private static void expire(Session oldSession, Session newSession) {
+    for (SessionListener l : listeners) {
+      l.onExpire(oldSession, newSession);
+    }
+  }
+
   public static void clear() {
     sessionQueue.clear();
     sessionMap.clear();
+  }
+
+  private static SessionId assignNewSessionId(SessionId sessionId) throws IOException {
+    SessionId tmp = createAnonymousSessionId();
+    byte[] userIdBytes = new byte[4];
+    tmp.readUserIdBytes(userIdBytes);
+    return sessionId.copyWithNewUserId(userIdBytes);
   }
 }

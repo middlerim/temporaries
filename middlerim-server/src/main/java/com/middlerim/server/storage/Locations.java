@@ -60,6 +60,16 @@ public final class Locations {
         map.remove(session.sessionId);
         persistentStorage.delete(session.sessionId.userId());
       }
+
+      @Override
+      public void onExpire(Session oldSession, Session newSession) {
+        SphericalPoint onMemory = map.findBySessionId(oldSession.sessionId);
+        if (onMemory != null) {
+          map.remove(oldSession.sessionId);
+          updateLocation(newSession, new Location(newSession.sessionId, onMemory.point()));
+        }
+        persistentStorage.delete(oldSession.sessionId.userId());
+      }
     });
   }
 }

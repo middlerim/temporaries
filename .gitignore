@@ -64,7 +64,9 @@ node_modules
 
 # Security
 **/google_maps_api.xml
+**/google-services.json
 *.dat
+*.keystore
 
 # Application
 **/db_test

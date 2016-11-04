@@ -28,6 +28,7 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
+import java.nio.charset.CoderResult;
 
 public class NewMessageFragment extends Fragment {
     public static final String TAG = Middlerim.TAG + ".NewMsg";
@@ -37,7 +38,6 @@ public class NewMessageFragment extends Fragment {
     private String displayName = "仮名さん";
     private EditText editText;
     private ImageButton sendButton;
-    private ByteBuffer buf;
     private CharsetEncoder encoder = Charset.forName("UTF-8").newEncoder();
     private AndroidContext androidContext;
     private int radius;
@@ -122,7 +122,6 @@ public class NewMessageFragment extends Fragment {
     @Override
     public void onResume() {
         super.onResume();
-        buf = ByteBuffer.allocateDirect(MAX_LENGTH * 2);
         radius = androidContext.preferences().getInt(Codes.PREF_AREA_RADIUS, 16);
         getActivity().findViewById(R.id.button_new_message).setVisibility(View.INVISIBLE);
         if (!hasContent(editText.getText().subSequence(0, editText.length()))) {
@@ -192,7 +191,6 @@ public class NewMessageFragment extends Fragment {
     @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
-        toggleSoftInput(!hidden);
     }
 
     private void toggleSoftInput(boolean show) {
@@ -208,6 +206,7 @@ public class NewMessageFragment extends Fragment {
     @Override
     public void onPause() {
         super.onPause();
+        toggleSoftInput(false);
         getActivity().findViewById(R.id.button_new_message).setVisibility(View.VISIBLE);
 
         if (editText.length() > 0) {
@@ -215,28 +214,26 @@ public class NewMessageFragment extends Fragment {
             prefEditor.putString(Codes.PREF_EDITING_MESSAGE, editText.getText().subSequence(0, editText.length()).toString());
             prefEditor.apply();
         }
-
-        if (buf != null) {
-            buf.clear();
-            buf = null;
-        }
     }
 
     public void onSendMessageButtonClick(View view) {
         char[] cs = new char[editText.length()];
         editText.getText().getChars(0, editText.length(), cs, 0);
         CharBuffer charBuffer = CharBuffer.wrap(cs);
-        buf.clear();
-        encoder.encode(charBuffer, buf, false);
+
+        ByteBuffer buf = ByteBuffer.allocateDirect(charBuffer.length() * 2);
+        encoder.reset();
+        CoderResult r = encoder.encode(charBuffer, buf, true);
+        if (r.isOverflow()) {
+            buf = ByteBuffer.allocateDirect(charBuffer.length() * 6);
+            encoder.reset();
+            r = encoder.encode(charBuffer, buf, true);
+        }
         buf.limit(buf.position());
         buf.position(0);
 
-        int tag = androidContext.buttonQueueManager().addButton(R.drawable.ic_sync_black_24dp, new ButtonQueueManager.ButtonCallback() {
-            @Override
-            public void onClick(View v) {
-                androidContext.fragmentManager().openMinuteMessage();
-            }
-        });
+        int tag = androidContext.buttonQueueManager().addButton(R.drawable.ic_sync_white_24px, FragmentManager.Page.MinuteMessage);
         ViewEvents.fireSubmitMessage(tag, displayName, MessageCommands.areaM(radius), buf);
+        getActivity().onBackPressed();
     }
 }

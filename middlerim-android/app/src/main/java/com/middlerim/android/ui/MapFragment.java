@@ -1,15 +1,16 @@
 package com.middlerim.android.ui;
 
 import android.graphics.Color;
-import android.graphics.Point;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.support.annotation.Nullable;
 import android.util.Log;
-import android.view.Display;
+import android.view.View;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.MapsInitializer;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptor;
@@ -67,11 +68,7 @@ public class MapFragment extends SupportMapFragment implements OnMapReadyCallbac
     public void onCreate(Bundle bundle) {
         super.onCreate(bundle);
         androidContext = AndroidContext.get(getContext());
-        Display display = getActivity().getWindowManager().getDefaultDisplay();
-        Point p = new Point();
-        display.getSize(p);
         ViewEvents.onChangeArea(TAG + ".changeAreaListener", changeAreaListener);
-        messageMarkerImage = BitmapDescriptorFactory.fromResource(R.drawable.scrubber_control_normal_holo);
     }
 
     @Override
@@ -86,6 +83,11 @@ public class MapFragment extends SupportMapFragment implements OnMapReadyCallbac
     @Override
     public void onMapReady(final GoogleMap googleMap) {
         map = googleMap;
+        if (messageMarkerImage == null) {
+            // Needed to call BitmapDescriptorFactory after googleMap is initialized.
+            messageMarkerImage = BitmapDescriptorFactory.fromResource(R.drawable.scrubber_control_normal_holo);
+        }
+
         // https://mapstyle.withgoogle.com
         boolean success = map.setMapStyle(MapStyleOptions.loadRawResourceStyle(getContext(), R.raw.map_style));
 

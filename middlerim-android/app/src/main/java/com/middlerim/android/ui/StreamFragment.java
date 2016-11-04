@@ -10,7 +10,6 @@ import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.SpannableStringBuilder;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -66,7 +65,10 @@ public class StreamFragment extends Fragment {
 
         @Override
         public void onBindViewHolder(final ViewHolder holder, int position) {
-            Message msg = messagePool.getLatest(position % Math.min(messagePool.size(), messagePool.capacity()));
+            Message msg = messagePool.get(position);
+            if (msg == null) {
+                return;
+            }
             holder.item = msg;
             holder.displayName.setText(holder.item.displayName);
             holder.message.setText(holder.item.message);
@@ -85,7 +87,7 @@ public class StreamFragment extends Fragment {
 
         @Override
         public int getItemCount() {
-            return messagePool.size() >= messagePool.capacity() ? Integer.MAX_VALUE : messagePool.size();
+            return messagePool.size();
         }
     };
 
@@ -100,10 +102,7 @@ public class StreamFragment extends Fragment {
                 message.get(bs);
                 SpannableStringBuilder sb = new SpannableStringBuilder(new String(bs, Config.MESSAGE_ENCODING));
                 Message msg = new Message(userId, location, displayName, sb, numberOfDelivery);
-
-                if (pauseAt == ACTIVE) {
-                    scrollTo(messagePool.size());
-                }
+                viewAdapter.notifyItemInserted(messagePool.size());
                 return msg;
             }
 
@@ -147,23 +146,13 @@ public class StreamFragment extends Fragment {
         } else {
             int p = pauseAt;
             pauseAt = ACTIVE;
-            if (p != ACTIVE && messagePool.size() > 0) {
+            if (p != ACTIVE && p != messagePool.size()) {
                 Resources res = getResources();
                 String text = res.getString(R.string.info_unread_messages, messagePool.size() - p);
                 final Toast toast = Toast.makeText(getContext(), text, Toast.LENGTH_SHORT);
                 toast.show();
             }
         }
-    }
-
-    private void scrollTo(final int position) {
-        handler.post(new Runnable() {
-            @Override
-            public void run() {
-                viewAdapter.notifyItemInserted(position);
-                view.smoothScrollToPosition(position);
-            }
-        });
     }
 
     public static class Message {

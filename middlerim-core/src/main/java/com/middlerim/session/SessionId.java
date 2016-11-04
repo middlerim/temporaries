@@ -51,7 +51,6 @@ public final class SessionId {
   public boolean validateServerSequenceNoAndRefresh(short sequenceNo) {
     if (this == ANONYMOUS || status == NEW || (short) (this.serverSequenceNo + 1) == sequenceNo) {
       this.serverSequenceNo = sequenceNo;
-      status = DEFAULT;
       return true;
     }
     return false;
@@ -60,7 +59,6 @@ public final class SessionId {
   public boolean validateClientAndRefresh(SessionId sessionId) {
     if (this == ANONYMOUS || userId == sessionId.userId && (status == NEW || (byte) (this.clientSequenceNo + 1) == sessionId.clientSequenceNo)) {
       this.clientSequenceNo = sessionId.clientSequenceNo;
-      status = DEFAULT;
       return true;
     }
     return false;
@@ -105,12 +103,21 @@ public final class SessionId {
 
   public void incrementClientSequenceNo() {
     clientSequenceNo++;
-    status = DEFAULT;
   }
 
   public void incrementServerSequenceNo() {
     serverSequenceNo++;
-    status = DEFAULT;
+  }
+
+  public SessionId copyWithNewUserId(byte[] userId) {
+    byte[] bytes = new byte[8];
+    readBytes(bytes);
+    bytes[0] = userId[0];
+    bytes[1] = userId[1];
+    bytes[2] = userId[2];
+    bytes[3] = userId[3];
+    SessionId copied = new SessionId(bytes);
+    return copied;
   }
 
   public SessionId copyWithNewServerSequenceNo(short sequenceNo) {

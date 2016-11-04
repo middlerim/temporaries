@@ -14,6 +14,10 @@ public class FragmentManager {
     private static ArrayDeque<Fragment[]> fragmentstack;
     private static android.support.v4.app.FragmentManager fm;
 
+    public enum Page {
+        MinuteMessage
+    }
+
     private FragmentActivity activity;
 
     public FragmentManager(FragmentActivity activity) {
@@ -125,6 +129,14 @@ public class FragmentManager {
         manageBackStack(transaction, minuteMessage);
         transaction.commit();
         return true;
+    }
+
+    public void open(Page page) {
+        switch (page) {
+            case MinuteMessage:
+                openMinuteMessage();
+                break;
+        }
     }
 
     private MainFragment openMainFragment(FragmentTransaction transaction) {

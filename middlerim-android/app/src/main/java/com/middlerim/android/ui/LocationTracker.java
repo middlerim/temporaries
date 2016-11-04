@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.ActivityCompat;
 
+import com.middlerim.client.Config;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.location.Coordinate;
 
@@ -16,12 +17,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class LocationTracker {
-    private static final Logger LOG = LoggerFactory.getLogger(LocationTracker.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
 
-    private static final int LOCATION_INTERVAL_FG = 5000;
-    private static final float LOCATION_DISTANCE_FG = 200f;
+    private static final int LOCATION_INTERVAL_FG = Config.SESSION_TIMEOUT_MILLIS / 2;
+    private static final float LOCATION_DISTANCE_FG = 50f;
 
-    private static final int LOCATION_INTERVAL_BG = LOCATION_INTERVAL_FG * 20;
+    private static final int LOCATION_INTERVAL_BG = Config.SESSION_TIMEOUT_MILLIS - 5000;
     private static final float LOCATION_DISTANCE_BG = LOCATION_DISTANCE_FG * 2;
 
     private LocationManager locationManager;

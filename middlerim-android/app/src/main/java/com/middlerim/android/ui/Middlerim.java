@@ -15,25 +15,25 @@ import android.view.View;
 import android.widget.Toast;
 
 import com.middlerim.client.CentralEvents;
+import com.middlerim.client.Config;
 import com.middlerim.client.view.ViewEvents;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class Middlerim extends AppCompatActivity {
-    private static final Logger LOG = LoggerFactory.getLogger(Middlerim.class);
-    public static final String TAG = "Middlerim";
+    public static final String TAG = Config.INTERNAL_APP_NAME;
+    private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
 
     private Toolbar toolbar;
     private int originalToolbarHeight = -1;
     private AndroidContext androidContext;
     private SparseIntArray buttonQueueIds = new SparseIntArray(5);
 
-    {
+    static {
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
                 .permitAll().build();
         StrictMode.setThreadPolicy(policy);
-
     }
 
     private CentralEvents.Listener<CentralEvents.ErrorEvent> errorEventListener = new CentralEvents.Listener<CentralEvents.ErrorEvent>() {
@@ -79,6 +79,7 @@ public class Middlerim extends AppCompatActivity {
     };
 
     private CentralEvents.Listener<CentralEvents.ReceivedTextEvent> receivedTextListener = new CentralEvents.Listener<CentralEvents.ReceivedTextEvent>() {
+        private boolean init = false;
         private byte lastReveicedSequenceNo = Byte.MIN_VALUE;
 
         @Override
@@ -89,7 +90,7 @@ public class Middlerim extends AppCompatActivity {
             }
             buttonQueueIds.delete(event.clientSequenceNo);
             androidContext.buttonQueueManager().removeButton(tag);
-            if ((lastReveicedSequenceNo + 1) != event.clientSequenceNo) {
+            if (init && (lastReveicedSequenceNo + 1) != event.clientSequenceNo) {
                 // Despite clientSequenceNo must be sequencial, it isn't. Some messages might be lost.
                 for (int i = lastReveicedSequenceNo; i < event.clientSequenceNo; i++) {
                     int leftOverTag = buttonQueueIds.get(i, -1);
@@ -103,6 +104,7 @@ public class Middlerim extends AppCompatActivity {
                         + lastReveicedSequenceNo + ", curr: " + event.clientSequenceNo);
             }
             lastReveicedSequenceNo = event.clientSequenceNo;
+            init = true;
         }
     };
 

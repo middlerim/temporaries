@@ -10,13 +10,21 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.LinearInterpolator;
+import android.view.animation.RotateAnimation;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+
+import com.middlerim.client.channel.OutboundSynchronizer;
+import com.middlerim.client.message.Text;
+import com.middlerim.message.SequentialMessage;
+
+import java.util.ArrayDeque;
 
 public class MainFragment extends Fragment implements ButtonQueueManager.Adopter {
     public static final String TAG = Middlerim.TAG + ".Main";
     private AndroidContext androidContext;
-    private ButtonQueueManager buttonQueueManager;
     private ViewGroup buttonQueue;
 
     @Override
@@ -37,7 +45,19 @@ public class MainFragment extends Fragment implements ButtonQueueManager.Adopter
             }
         });
         buttonQueue = (ViewGroup) view.findViewById(R.id.button_queue);
+        inflateButtonQueue();
+
         return view;
+    }
+
+    private void inflateButtonQueue() {
+        ArrayDeque<OutboundSynchronizer.MessageAndContext<SequentialMessage>> leftOverMessages = OutboundSynchronizer.getMessageQueue();
+        OutboundSynchronizer.MessageAndContext<SequentialMessage> m;
+        while ((m = leftOverMessages.poll()) != null) {
+            if (m.message instanceof Text.Out) {
+                androidContext.buttonQueueManager().addButton(m.message.tag(), R.drawable.ic_sync_white_24px, FragmentManager.Page.MinuteMessage);
+            }
+        }
     }
 
     @Override
@@ -77,8 +97,18 @@ public class MainFragment extends Fragment implements ButtonQueueManager.Adopter
         button.setLayoutParams(lp);
         button.setImageResource(id);
         button.setClickable(true);
+        button.getBackground().setAlpha(0);
+
+        RotateAnimation rotate = new RotateAnimation(180, 0, Animation.RELATIVE_TO_SELF, 0.5f, Animation.RELATIVE_TO_SELF, 0.5f);
+        rotate.setDuration(3000);
+        rotate.setFillAfter(true);
+        rotate.setRepeatCount(RotateAnimation.INFINITE);
+        rotate.setInterpolator(new LinearInterpolator());
+        button.startAnimation(rotate);
+
         return button;
     }
+
 
     @Override
     public void addButton(View button) {

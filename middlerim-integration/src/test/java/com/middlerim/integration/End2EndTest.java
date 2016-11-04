@@ -26,6 +26,7 @@ import com.middlerim.client.session.Sessions;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.location.Coordinate;
 import com.middlerim.location.Point;
+import com.middlerim.server.Config;
 import com.middlerim.server.Headers;
 import com.middlerim.server.MessageCommands;
 import com.middlerim.server.UdpServer;
@@ -162,6 +163,7 @@ public class End2EndTest {
     try {
       clientSocket = new DatagramSocket();
       byte[] sessionIdBytes = new byte[8];
+      sessionId.incrementClientSequenceNo();
       sessionId.readBytes(sessionIdBytes);
       byte[] data = Unpooled.buffer(15)
           .writeByte(Headers.mask(Headers.TEXT, Headers.COMPLETE))
@@ -177,7 +179,6 @@ public class End2EndTest {
       clientSocket.receive(receivePacket);
       int numberOfReceiver = Bytes.bytesToInt(new byte[]{receivedData[2], receivedData[3], receivedData[4], receivedData[5]});
       LOG.debug("Sent dummy message and delivered to {} users", numberOfReceiver);
-      sessionId.incrementClientSequenceNo();
       return numberOfReceiver;
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -303,7 +304,7 @@ public class End2EndTest {
     assertThat(Sessions.getSession().sessionId.clientSequenceNo(), is(serverSessionUserA.sessionId.clientSequenceNo()));
 
     Session serverSessionUserB = com.middlerim.server.storage.Sessions.getSession(userB);
-    assertThat(userB.clientSequenceNo(), is((byte) (serverSessionUserB.sessionId.clientSequenceNo() + 1)));
+    assertThat(userB.clientSequenceNo(), is(serverSessionUserB.sessionId.clientSequenceNo()));
 
     setLocation(userB, MARUNOUCHI_2_4_2_TOKYO);
     for (int i = 0; i < 10; i++) {
@@ -315,14 +316,17 @@ public class End2EndTest {
     assertThat(Sessions.getSession().sessionId.clientSequenceNo(), is(serverSessionUserA.sessionId.clientSequenceNo()));
 
     serverSessionUserB = com.middlerim.server.storage.Sessions.getSession(userB);
-    assertThat(userB.clientSequenceNo(), is((byte) (serverSessionUserB.sessionId.clientSequenceNo() + 1)));
+    assertThat(userB.clientSequenceNo(), is(serverSessionUserB.sessionId.clientSequenceNo()));
   }
 
   @Test
-  public void testAgainRequestFromClient() throws InterruptedException {
+  public void testSessionTimeout() throws InterruptedException {
     updateLocation(MARUNOUCHI_2_4_1_TOKYO);
-    // TODO
-    Session session = Sessions.getSession();
+    Session session1 = Sessions.getSession();
+    Thread.sleep(Config.SESSION_TIMEOUT_MILLIS * 2);
+    updateLocation(MARUNOUCHI_2_4_2_TOKYO);
+    Session session2 = Sessions.getSession();
+    assertThat(session2.sessionId.userId(), is(session1.sessionId.userId() + 1));
   }
 
   @Test

@@ -25,7 +25,7 @@ public final class CentralEvents {
   public static void removeListener(String name) {
     Listener<?> listener = listeneres.remove(name);
     if (listener == null) {
-      throw new IllegalStateException(name + " hasn't been added.");
+      return;
     }
     startedListeners.remove(listener);
     errorListeners.remove(listener);

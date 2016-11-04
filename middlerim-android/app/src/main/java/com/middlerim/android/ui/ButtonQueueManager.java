@@ -3,44 +3,62 @@ package com.middlerim.android.ui;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.DrawableRes;
+import android.util.SparseIntArray;
 import android.view.View;
 
+import com.middlerim.client.Config;
 import com.middlerim.client.view.ViewEvents;
+
+import java.util.HashMap;
+import java.util.Map;
 
 public class ButtonQueueManager {
 
-    public static final int MAX_BUTTON_QUEUE = 20;
-    private static int index = 0;
+    public static final int MAX_BUTTON_QUEUE = Config.MAX_MESSAGE_QUEUE + 10;
+
+    private static int index;
     private static View[] buttons;
+    private static SparseIntArray tagMap;
 
+    private AndroidContext context;
     private Adopter adopter;
-
     private Handler mainLoop;
 
-    public ButtonQueueManager(Adopter adopter) {
-        this.adopter = adopter;
-        this.mainLoop = new Handler(Looper.getMainLooper());
-        synchronized (ButtonQueueManager.class) {
-            if (buttons == null) {
-                buttons = new View[MAX_BUTTON_QUEUE];
-                ViewEvents.onPause("ButtonQueueManager.ViewEvents.Listener<ViewEvents.PauseEvent>", new ViewEvents.Listener<ViewEvents.PauseEvent>() {
-                    @Override
-                    public void handle(ViewEvents.PauseEvent event) {
-                        index = 0;
-                        buttons = null;
-                    }
-                });
+    static {
+        ViewEvents.onPause("ButtonQueueManager.ViewEvents.Listener<ViewEvents.PauseEvent>", new ViewEvents.Listener<ViewEvents.PauseEvent>() {
+            @Override
+            public void handle(ViewEvents.PauseEvent event) {
+                index = 0;
+                buttons = null;
+                tagMap = null;
             }
-        }
+        });
     }
 
-    public int addButton(@DrawableRes int id, ButtonCallback callback) {
+    public ButtonQueueManager(Adopter adopter, AndroidContext context) {
+        this.context = context;
+        this.adopter = adopter;
+        this.mainLoop = new Handler(Looper.getMainLooper());
+    }
+
+    public int addButton(int tag, @DrawableRes int id, final FragmentManager.Page callbackPage) {
+        if (buttons == null) {
+            index = 0;
+            buttons = new View[MAX_BUTTON_QUEUE];
+            tagMap = new SparseIntArray(MAX_BUTTON_QUEUE);
+        }
+
         index++;
         if (index >= MAX_BUTTON_QUEUE) {
             index = 0;
         }
         final View button = adopter.createNewButton(id);
-        button.setOnClickListener(callback);
+        button.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                context.fragmentManager().open(callbackPage);
+            }
+        });
         buttons[index] = button;
         mainLoop.post(new Runnable() {
             @Override
@@ -48,10 +66,24 @@ public class ButtonQueueManager {
                 adopter.addButton(button);
             }
         });
+        if (tag == -1) {
+            tagMap.append(index, index);
+        } else {
+            tagMap.append(tag, index);
+        }
         return index;
     }
 
-    public void removeButton(int index) {
+    public int addButton(@DrawableRes int id, final FragmentManager.Page callbackPage) {
+        return addButton(-1, id, callbackPage);
+    }
+
+    public void removeButton(int tag) {
+        int index = tagMap.get(tag);
+        removeButtonByIndex(index);
+    }
+
+    private void removeButtonByIndex(int index) {
         final View button = buttons[index];
         if (button == null) {
             return;
@@ -67,7 +99,7 @@ public class ButtonQueueManager {
 
     public void removeAllButtons() {
         for (int i = 0; i < buttons.length; i++) {
-            removeButton(i);
+            removeButtonByIndex(i);
         }
     }
 

@@ -108,7 +108,7 @@ public class ConsoleClient {
         c.countDown();
         if (c.getCount() > 0) {
           final ByteBuffer buf = ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()});
-          ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), buf);
+          ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(80), buf);
         }
       }
     });
@@ -135,7 +135,7 @@ public class ConsoleClient {
       if ("A".equals(s)) {
         System.out.println("Enter Point >");
         String point = br.readLine();
-        String[] points = point.split(":");
+        String[] points = point.split(", ");
         ViewEvents.fireLocationUpdate(new Coordinate(Double.parseDouble(points[0]), Double.parseDouble(points[1])));
       } else if ("B".equals(s)) {
         System.out.println("Enter Message >");

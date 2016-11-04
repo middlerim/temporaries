@@ -27,7 +27,8 @@ public class Location implements Inbound, Persistent<Location> {
   private Location() {
   }
 
-  public Location(Point point) {
+  public Location(SessionId sessionId, Point point) {
+    this.sessionId = sessionId;
     this.point = point;
   }
 

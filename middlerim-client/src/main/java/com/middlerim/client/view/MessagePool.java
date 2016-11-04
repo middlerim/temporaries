@@ -21,7 +21,8 @@ import com.middlerim.storage.persistent.Persistent;
 import com.middlerim.storage.persistent.StorageInformation;
 
 public class MessagePool<T> implements Closeable {
-  private static final Logger LOG = LoggerFactory.getLogger(MessagePool.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
+
   public interface Adapter<T> {
     T onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery);
     File storage();
@@ -121,7 +122,9 @@ public class MessagePool<T> implements Closeable {
   }
 
   private void onReceiveMessage(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
+    message.position(0);
     storage.put(new Message(last, userId, location, displayName, message, numberOfDelivery));
+    message.position(0);
     addLast(adapter.onReceive(userId, location, displayName, message, numberOfDelivery));
   }
 
@@ -185,8 +188,7 @@ public class MessagePool<T> implements Closeable {
       this.userId = userId;
       this.location = location;
       this.displayName = displayName.getBytes(Config.MESSAGE_ENCODING);
-      int left = MAX_RECORD_SIZE - 28 - displayName.length();
-      message.position(0);
+      int left = MAX_RECORD_SIZE - 28 - this.displayName.length;
       if (left <= message.remaining()) {
         byte[] bs = new byte[left];
         message.get(bs);

@@ -4,6 +4,7 @@ import java.net.InetSocketAddress;
 
 public class Session {
   public final SessionId sessionId;
+  public final long createdTimeMillis;
   public long lastAccessTimeMillis;
   public InetSocketAddress address;
 
@@ -12,20 +13,22 @@ public class Session {
     return new Session(sessionId, System.currentTimeMillis(), address);
   }
 
-  private Session(SessionId sessionId, long createTimeMillis, InetSocketAddress address) {
+  private Session(SessionId sessionId, long createdTimeMillis, InetSocketAddress address) {
     this.sessionId = sessionId;
-    this.lastAccessTimeMillis = createTimeMillis;
+    this.createdTimeMillis = createdTimeMillis;
+    this.lastAccessTimeMillis = createdTimeMillis;
     this.address = address;
   }
-  
+
   public void touch() {
+    sessionId.status = SessionId.DEFAULT;
     this.lastAccessTimeMillis = System.currentTimeMillis();
   }
 
   public boolean isNotAssigned() {
     return sessionId.userId() == SessionId.UNASSIGNED_USERID;
   }
-  
+
   public boolean isNew() {
     return sessionId.status == SessionId.NEW;
   }

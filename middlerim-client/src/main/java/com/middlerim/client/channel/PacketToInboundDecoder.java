@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.middlerim.client.CentralEvents;
+import com.middlerim.client.Config;
 import com.middlerim.client.message.Markers;
 import com.middlerim.client.message.MessageLost;
 import com.middlerim.client.message.Text;
@@ -32,7 +33,8 @@ import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.MessageToMessageDecoder;
 
 public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPacket> {
-  private static final Logger LOG = LoggerFactory.getLogger(PacketToInboundDecoder.class);
+  private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
+
   private static Map<Session, ByteBuffer> fragmentedBufferMap = new ConcurrentHashMap<>();
   private final ViewContext viewContext;
 
@@ -49,37 +51,40 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     }
     byte header = in.readByte();
     if (header == Headers.ASSIGN_AID) {
-      if (!Sessions.getSession().isNotAssigned()) {
+      Session session = Sessions.getSession();
+      if (!session.isNotAssigned()) {
         // Already assigned. It happens because it's not synchronizing while ASSIGN_AID is being requested.
-        if (viewContext.isDebug()) {
-          LOG.debug("Packet[ASSGIN_AID]: Ignored since annonymous ID has been assinged already.");
-        }
+        LOG.info("Packet[ASSGIN_AID]: Ignored since annonymous ID has been assinged already.");
         return;
       }
       byte[] tokenBytes = new byte[8];
       in.readBytes(tokenBytes);
       SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
       Sessions.setSession(Session.create(sessionId, Sessions.getSession().address));
-      if (viewContext.isDebug()) {
-        LOG.debug("Packet[ASSGIN_AID]: Received new anonymous session ID." + sessionId);
-      }
+      LOG.debug("Packet[ASSGIN_AID]: Received new anonymous session ID: {}", sessionId);
       CentralEvents.fireReceived(SessionId.UNASSIGNED_SEQUENCE_NO);
+      return;
+    }
+    if (header == Headers.UPDATE_AID) {
+      byte[] userIdBytes = new byte[4];
+      in.readBytes(userIdBytes);
+      SessionId sessionId = Sessions.getSession().sessionId.copyWithNewUserId(userIdBytes);
+      Sessions.setSession(Session.create(sessionId, Sessions.getSession().address));
+      LOG.debug("Packet[UPDATE_AID]: Received new anonymous user ID: {}", sessionId);
       return;
     }
 
     Session session = Sessions.getSession();
     if (session == null || !session.address.equals(msg.sender())) {
       // sender address must be same to prevent malicious packet.
-      LOG.warn("Access from unknown address: " + msg.sender() + ", current session is " + session);
+      LOG.warn("Access from unknown address: {}, current session is {}", msg.sender(), session);
       return;
     }
 
     if (header == Headers.AGAIN) {
       // Synchronize sequenceNo on the client with central server.
       byte clientSequenceNo = in.readByte();
-      if (viewContext.isDebug()) {
-        LOG.debug("Packet[AGAIN]:  clientSequenceNo on central server=" + clientSequenceNo + ", on the client=" + session.sessionId.clientSequenceNo());
-      }
+      LOG.debug("Packet[AGAIN]:  clientSequenceNo on central server={}, on the client={}", clientSequenceNo, session.sessionId.clientSequenceNo());
       session.sessionId.synchronizeClientWithServer(clientSequenceNo);
       out.add(Markers.AGAIN);
       return;
@@ -87,15 +92,11 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
 
     if (Headers.isMasked(header, Headers.RECEIVED)) {
       byte clientSequenceNo = in.readByte();
-      if (viewContext.isDebug()) {
-        LOG.debug("Packet[RECEIVED]: " + clientSequenceNo);
-      }
+      LOG.debug("Packet[RECEIVED]: {}", clientSequenceNo);
       CentralEvents.fireReceived(clientSequenceNo);
       if (Headers.isMasked(header, Headers.TEXT)) {
         int numberOfDelivery = in.readInt();
-        if (viewContext.isDebug()) {
-          LOG.debug("Packet[RECEIVED&TEXT]: " + numberOfDelivery);
-        }
+        LOG.debug("Packet[RECEIVED&TEXT]: {}", numberOfDelivery);
         CentralEvents.fireReceivedText(clientSequenceNo, numberOfDelivery);
       }
       return;
@@ -103,9 +104,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     short serverSequenceNo = in.readShort();
     if (!session.sessionId.validateServerSequenceNoAndRefresh(serverSequenceNo)) {
       // Messages from server can be asynchronous. However, some messages are lost and will be requested.
-      if (viewContext.isDebug()) {
-        LOG.debug("Invalid sequenceNo: " + (short) (session.sessionId.serverSequenceNo() + 1) + " != " + serverSequenceNo);
-      }
+      LOG.debug("Invalid sequenceNo: {} != {}", (short) (session.sessionId.serverSequenceNo() + 1), serverSequenceNo);
       ctx.channel().write(new MessageLost(session.sessionId.serverSequenceNo(), serverSequenceNo));
     }
     ctx.channel().writeAndFlush(Markers.RECEIVED);
@@ -113,9 +112,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (Headers.isMasked(header, Headers.FRAGMENT)) {
       int paylaadSize = in.readInt();
       int offset = in.readInt();
-      if (viewContext.isDebug()) {
-        LOG.debug("Packet[FRAGMENT]: " + offset + "/" + paylaadSize);
-      }
+      LOG.debug("Packet[FRAGMENT]: {}/{}", offset, paylaadSize);
       consumePayload(session, paylaadSize, offset, in);
       return;
     }
@@ -134,12 +131,10 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
         byte displayNameLength = buff.get();
         byte messageCommand = buff.get();
         if (buff.remaining() <= displayNameLength) {
-          LOG.warn("Received insufficient data. data length need at least " + displayNameLength + " but actually it's " + buff.remaining());
+          LOG.warn("Received insufficient data. data length need at least {} but actually it's {}", displayNameLength, buff.remaining());
           return;
         }
-        if (viewContext.isDebug()) {
-          LOG.debug("Packet[TEXT]: " + buff);
-        }
+        LOG.debug("Packet[TEXT]: {}", buff);
         out.add(new Text.In(Bytes.intToLong(userIdBytes), new Point(latitude, longtitude).toCoordinate(), displayNameLength, messageCommand, buff.slice()));
       }
     }

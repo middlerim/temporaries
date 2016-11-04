@@ -28,6 +28,11 @@ public final class Headers {
   public static final byte ASSIGN_AID = 0b0000100;
 
   /**
+   * Update Anonymous-ID.
+   */
+  public static final byte UPDATE_AID = 0b0000101;
+
+  /**
    * Unexpected error occurred.
    */
   public static final byte ERROR = 0b0000111;

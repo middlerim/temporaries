@@ -56,7 +56,7 @@ class AndroidContext extends ViewContext {
             if (main == null) {
                 throw new IllegalStateException("MainFragment need to be started.");
             }
-            buttonQueueManager = new ButtonQueueManager(main);
+            buttonQueueManager = new ButtonQueueManager(main, this);
             return buttonQueueManager;
         }
         throw new IllegalStateException("The context don't have fragmentManager" + ctx);

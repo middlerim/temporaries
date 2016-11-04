@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -14,8 +15,14 @@ import com.middlerim.server.channel.InboundHandler;
 import com.middlerim.server.channel.OutboundHandler;
 import com.middlerim.server.channel.PacketToInboundDecoder;
 import com.middlerim.server.channel.ServerMessageSizeEstimator;
+import com.middlerim.server.message.Markers;
+import com.middlerim.server.message.OutboundMessage;
+import com.middlerim.server.storage.Sessions;
+import com.middlerim.session.Session;
+import com.middlerim.session.SessionListener;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
@@ -28,6 +35,7 @@ import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.util.concurrent.DefaultThreadFactory;
 
 public class UdpServer {
   private static final Logger LOG = LoggerFactory.getLogger(UdpServer.class);
@@ -83,7 +91,20 @@ public class UdpServer {
     ChannelFuture bindFuture = b.bind(v4);
     closeFutures.add(bindFuture.channel().closeFuture());
     // closeFutures.add(b.bind(v6).channel().closeFuture());
+    setSessionExpireListener(bindFuture.channel());
     return bindFuture;
+  }
+
+  private static void setSessionExpireListener(final Channel channel) {
+    Sessions.addListener(new SessionListener() {
+      @Override
+      public void onRemove(Session session) {
+      }
+      @Override
+      public void onExpire(Session oldSession, Session newSession) {
+        channel.writeAndFlush(new OutboundMessage<>(newSession, Markers.UPDATE_AID));
+      }
+    });
   }
 
   public static void main(String[] args) {
@@ -110,7 +131,8 @@ public class UdpServer {
   }
 
   private EventLoopGroup createEventLoopGroup() {
-    return Config.isUnix ? new EpollEventLoopGroup(3) : new NioEventLoopGroup(3);
+    ThreadFactory tf = new DefaultThreadFactory(Config.INTERNAL_APP_NAME + "-server-background");
+    return Config.isUnix ? new EpollEventLoopGroup(3, tf) : new NioEventLoopGroup(3, tf);
   }
   private Class<? extends DatagramChannel> getChannelClass() {
     return Config.isUnix

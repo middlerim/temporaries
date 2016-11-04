@@ -40,7 +40,7 @@ public class Text {
       byte[] displayNameBytes = new byte[displayNameLength];
       data.get(displayNameBytes);
       String displayName = new String(displayNameBytes, Config.MESSAGE_ENCODING);
-      CentralEvents.fireReceiveMessage(userId, location, displayName, data);
+      CentralEvents.fireReceiveMessage(userId, location, displayName, data.slice());
     }
   }
 
@@ -52,7 +52,7 @@ public class Text {
     public final byte messageCommand;
     public final ByteBuffer messageBytes;
 
-    public Out(int tag,String displayName, byte messageCommand, ByteBuffer messageBytes) {
+    public Out(int tag, String displayName, byte messageCommand, ByteBuffer messageBytes) {
       this.tag = tag;
       this.displayName = displayName;
       this.displayNameBytes = displayName.getBytes(Config.MESSAGE_ENCODING);
@@ -81,8 +81,9 @@ public class Text {
 
         @Override
         public void operationComplete(ChannelFuture future) throws Exception {
-          messageBytes.position(0); // Reset position after finish it because ByteBuf might use the messageBytes in an other thread.
-          CentralEvents.fireSendMessage(tag, sequenceNo, displayName, messageBytes);
+          ByteBuffer copy = messageBytes.duplicate();
+          copy.position(0);
+          CentralEvents.fireSendMessage(tag, sequenceNo, displayName, copy);
         }
       });
       return cf;
