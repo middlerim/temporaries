@@ -198,6 +198,7 @@ public class InboundDataHandlerTest {
   @Test
   public void testMessageAndExit() {
     SessionId sessionId1 = createNewSession();
+    sessionId1.incrementClientSequenceNo();
     byte[] sessionIdBytes1 = new byte[8];
     sessionId1.readBytes(sessionIdBytes1);
 
@@ -213,15 +214,16 @@ public class InboundDataHandlerTest {
         1, 2, 3, 4, 1, 2, 3, 4};
     channel.writeInbound(Unpooled.wrappedBuffer(data));
     assertNull(channel.readOutbound());
-    byte[] displayNameBytes = "佐助✌".getBytes(Config.CHARSET_MESSAGE);
+    byte[] tag = new byte[]{3, 2, 0, 1};
+    byte[] displayNameBytes = "眞田𠀋助".getBytes(Config.CHARSET_MESSAGE);
     data = new byte[]{Headers.mask(Headers.TEXT, Headers.COMPLETE), sessionIdBytes1[0], sessionIdBytes1[1], sessionIdBytes1[2], sessionIdBytes1[3], sessionIdBytes1[4], sessionIdBytes1[5], sessionIdBytes1[6], sessionIdBytes1[7],
-        MessageCommands.areaKM(10), (byte) displayNameBytes.length};
+        tag[0], tag[1], tag[2], tag[3], MessageCommands.areaKM(10), (byte) displayNameBytes.length};
     channel.writeInbound(Unpooled.unmodifiableBuffer(Unpooled.wrappedBuffer(data), Unpooled.wrappedBuffer(displayNameBytes), Unpooled.wrappedBuffer("はじめまして🙌".getBytes(Config.CHARSET_MESSAGE))));
 
     assertNotNull(Locations.findBySessionId(sessionId2));
 
     DatagramPacket received = channel.readOutbound();
-    assertEquals(Unpooled.wrappedBuffer(new byte[]{Headers.mask(Headers.RECEIVED, Headers.TEXT), sessionIdBytes1[5], 0, 0, 0, 1}), received.content());
+    assertEquals(Unpooled.wrappedBuffer(new byte[]{Headers.mask(Headers.RECEIVED, Headers.TEXT), tag[0], tag[1], tag[2], tag[3], 0, 0, 0, 1}), received.content());
 
     DatagramPacket message = channel.readOutbound();
     sessionId2.incrementServerSequenceNo();
@@ -238,10 +240,13 @@ public class InboundDataHandlerTest {
 
     sessionId1.incrementClientSequenceNo();
     sessionId1.readBytes(sessionIdBytes1);
-    data = new byte[]{Headers.mask(Headers.TEXT, Headers.COMPLETE), sessionIdBytes1[0], sessionIdBytes1[1], sessionIdBytes1[2], sessionIdBytes1[3], sessionIdBytes1[4], sessionIdBytes1[5], sessionIdBytes1[6], sessionIdBytes1[7], MessageCommands.areaKM(10)};
-    channel.writeInbound(Unpooled.unmodifiableBuffer(Unpooled.wrappedBuffer(data), Unpooled.wrappedBuffer("はじめまして🙌".getBytes(Config.CHARSET_MESSAGE))));
+
+    tag[2] = 127; // Update tag.
+    data = new byte[]{Headers.mask(Headers.TEXT, Headers.COMPLETE), sessionIdBytes1[0], sessionIdBytes1[1], sessionIdBytes1[2], sessionIdBytes1[3], sessionIdBytes1[4], sessionIdBytes1[5], sessionIdBytes1[6], sessionIdBytes1[7],
+        tag[0], tag[1], tag[2], tag[3], MessageCommands.areaKM(10), (byte) displayNameBytes.length};
+    channel.writeInbound(Unpooled.unmodifiableBuffer(Unpooled.wrappedBuffer(data), Unpooled.wrappedBuffer(displayNameBytes), Unpooled.wrappedBuffer("はじめまして🙌".getBytes(Config.CHARSET_MESSAGE))));
     received = channel.readOutbound();
-    assertEquals(Unpooled.wrappedBuffer(new byte[]{Headers.mask(Headers.RECEIVED, Headers.TEXT), sessionIdBytes1[5], 0, 0, 0, 0}), received.content());
+    assertEquals(Unpooled.wrappedBuffer(new byte[]{Headers.mask(Headers.RECEIVED, Headers.TEXT), tag[0], tag[1], tag[2], tag[3], 0, 0, 0, 0}), received.content());
     assertNull(channel.readOutbound());
   }
 }

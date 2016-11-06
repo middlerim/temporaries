@@ -32,15 +32,15 @@ public class MessagePool<T> implements Closeable {
     void onRemoved(int index, T message);
   }
 
-  private Map<Byte, CentralEvents.SendMessageEvent> myMessages;
+  private Map<Integer, ViewEvents.SubmitMessageEvent> myMessages;
 
   private CentralEvents.Listener<CentralEvents.ReceivedTextEvent> receivedTextListener = new CentralEvents.Listener<CentralEvents.ReceivedTextEvent>() {
     @Override
     public void handle(CentralEvents.ReceivedTextEvent event) {
-      CentralEvents.SendMessageEvent sendMessageEvent = myMessages.remove(event.clientSequenceNo);
-      if (sendMessageEvent != null) {
+      ViewEvents.SubmitMessageEvent submitMessageEvent = myMessages.remove(event.tag);
+      if (submitMessageEvent != null) {
         Session session = Sessions.getSession();
-        onReceiveMessage(session.sessionId.userId(), null, sendMessageEvent.displayName, sendMessageEvent.message, event.numberOfDelivery);
+        onReceiveMessage(session.sessionId.userId(), null, submitMessageEvent.displayName, submitMessageEvent.message, event.numberOfDelivery);
       }
     }
   };
@@ -52,11 +52,11 @@ public class MessagePool<T> implements Closeable {
     }
   };
 
-  private CentralEvents.Listener<CentralEvents.SendMessageEvent> sendMessageListener = new CentralEvents.Listener<CentralEvents.SendMessageEvent>() {
+  private ViewEvents.Listener<ViewEvents.SubmitMessageEvent> submitMessageListener = new ViewEvents.Listener<ViewEvents.SubmitMessageEvent>() {
 
     @Override
-    public void handle(CentralEvents.SendMessageEvent event) {
-      myMessages.put(event.clientSequenceNo, event);
+    public void handle(ViewEvents.SubmitMessageEvent event) {
+      myMessages.put(event.tag, event);
     }
   };
 
@@ -101,6 +101,10 @@ public class MessagePool<T> implements Closeable {
     return (T) pool[i];
   }
 
+  public ViewEvents.SubmitMessageEvent getUnreachedMessage(int tag) {
+    return myMessages.get(tag);
+  }
+
   @SuppressWarnings("unchecked")
   private void addLast(T elem) {
     if (last >= capacity) {
@@ -139,7 +143,7 @@ public class MessagePool<T> implements Closeable {
     listening = true;
     CentralEvents.onReceivedText("MessagePool.receivedTextListener", receivedTextListener);
     CentralEvents.onReceiveMessage("MessagePool.receiveMessageListener", receiveMessageListener);
-    CentralEvents.onSendMessage("MessagePool.sendMessageListener", sendMessageListener);
+    ViewEvents.onSubmitMessage("MessagePool.submitMessageListener", submitMessageListener);
     return this;
   }
 

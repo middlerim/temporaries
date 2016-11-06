@@ -1,5 +1,6 @@
 package com.middlerim.android.ui;
 
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.support.annotation.DrawableRes;
@@ -41,7 +42,7 @@ public class ButtonQueueManager {
         this.mainLoop = new Handler(Looper.getMainLooper());
     }
 
-    public int addButton(int tag, @DrawableRes int id, final FragmentManager.Page callbackPage) {
+    public int addButton(int tag, @DrawableRes int id, final FragmentManager.Page callbackPage, final Bundle args) {
         if (buttons == null) {
             index = 0;
             buttons = new View[MAX_BUTTON_QUEUE];
@@ -56,7 +57,7 @@ public class ButtonQueueManager {
         button.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                context.fragmentManager().open(callbackPage);
+                context.fragmentManager().open(callbackPage, args);
             }
         });
         buttons[index] = button;
@@ -72,10 +73,6 @@ public class ButtonQueueManager {
             tagMap.append(tag, index);
         }
         return index;
-    }
-
-    public int addButton(@DrawableRes int id, final FragmentManager.Page callbackPage) {
-        return addButton(-1, id, callbackPage);
     }
 
     public void removeButton(int tag) {

@@ -16,7 +16,6 @@ import org.slf4j.LoggerFactory;
 import com.middlerim.server.Config;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
-import com.middlerim.session.SessionListener;
 import com.middlerim.storage.persistent.IdStorage;
 import com.middlerim.storage.persistent.IdStorageInformation;
 
@@ -44,7 +43,7 @@ public final class Sessions {
           ? new IdStorageInformation("aid", 1, 10000)
           : new IdStorageInformation("aid", SessionId.ANONYMOUS_USER_FROM, SessionId.ANONYMOUS_USER_TO));
 
-  private static Map<SessionId, Session> sessionMap = new HashMap<>(Config.TEST ? 10000 : Config.MAX_ACTIVE_SESSION_SIZE);
+  private static Map<Long, Session> sessionMap = new HashMap<>(Config.TEST ? 10000 : Config.MAX_ACTIVE_SESSION_SIZE);
 
   private static List<SessionListener> listeners = new ArrayList<>();
 
@@ -63,7 +62,7 @@ public final class Sessions {
               LOG.debug("The session {} is using the session ID for a long time. It's time to assign a new session ID.", last);
               sessionQueue.poll();
               synchronized (sessionMap) {
-                sessionMap.remove(last.sessionId);
+                sessionMap.remove(last.sessionId.userId());
               }
               expire(last, getOrCreateSession(last.sessionId, last.address));
             } else if (last.lastAccessTimeMillis + Config.SESSION_TIMEOUT_MILLIS <= currentTimeMillis) {
@@ -81,8 +80,19 @@ public final class Sessions {
     }, Config.SESSION_TIMEOUT_MILLIS, Config.SESSION_TIMEOUT_MILLIS / 2);
   }
 
-  public static Session getSession(SessionId sessionId) {
-    return sessionMap.get(sessionId);
+  public static Session getValidatedSession(SessionId clientSessionId) {
+    Session session = sessionMap.get(clientSessionId.userId());
+    if (session == null) {
+      return null;
+    }
+    if (!session.sessionId.validateClient(clientSessionId)) {
+      return null;
+    }
+    return session;
+  }
+
+  public static Session getSession(long userId) {
+    return sessionMap.get(userId);
   }
 
   private static SessionId createAnonymousSessionId() throws IOException {
@@ -104,7 +114,7 @@ public final class Sessions {
 
   private static Session getOrCreateSession0(SessionId sessionId, InetSocketAddress address) throws IOException {
     synchronized (sessionMap) {
-      Session session = sessionId != null ? sessionMap.get(sessionId) : null;
+      Session session = sessionId != null ? sessionMap.get(sessionId.userId()) : null;
       if (session == null) {
         if (sessionId == null) {
           sessionId = createAnonymousSessionId();
@@ -113,7 +123,7 @@ public final class Sessions {
           sessionId = assignNewSessionId(sessionId);
         }
         session = Session.create(sessionId, address);
-        sessionMap.put(sessionId, session);
+        sessionMap.put(sessionId.userId(), session);
         sessionQueue.add(session);
         if (sessionQueue.size() >= Config.MAX_ACTIVE_SESSION_SIZE) {
           Session last = sessionQueue.poll();
@@ -137,7 +147,7 @@ public final class Sessions {
       l.onRemove(session);
     }
     synchronized (sessionMap) {
-      sessionMap.remove(session.sessionId);
+      sessionMap.remove(session.sessionId.userId());
     }
   }
 

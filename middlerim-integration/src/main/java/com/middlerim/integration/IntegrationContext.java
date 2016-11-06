@@ -3,6 +3,7 @@ package com.middlerim.integration;
 import java.io.File;
 
 import com.middlerim.client.CentralEvents;
+import com.middlerim.client.view.MessagePool;
 import com.middlerim.client.view.ViewContext;
 
 public class IntegrationContext extends ViewContext {
@@ -18,5 +19,10 @@ public class IntegrationContext extends ViewContext {
   @Override
   public boolean isDebug() {
     return true;
+  }
+
+  @Override
+  public MessagePool<?> getMessagePool() {
+    return null;
   }
 }

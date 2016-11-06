@@ -9,7 +9,7 @@ import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
-import android.util.SparseIntArray;
+import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
@@ -26,9 +26,8 @@ public class Middlerim extends AppCompatActivity {
     private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
 
     private Toolbar toolbar;
-    private int originalToolbarHeight = -1;
     private AndroidContext androidContext;
-    private SparseIntArray buttonQueueIds = new SparseIntArray(5);
+    private int actionBarHeight;
 
     static {
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder()
@@ -54,15 +53,6 @@ public class Middlerim extends AppCompatActivity {
         }
     };
 
-
-    private CentralEvents.Listener<CentralEvents.SendMessageEvent> sendMessageListener = new CentralEvents.Listener<CentralEvents.SendMessageEvent>() {
-        @Override
-        public void handle(CentralEvents.SendMessageEvent event) {
-            buttonQueueIds.put(event.clientSequenceNo, event.tag);
-        }
-    };
-
-
     private CentralEvents.Listener<CentralEvents.LostMessageEvent> lostMessageListener = new CentralEvents.Listener<CentralEvents.LostMessageEvent>() {
         @Override
         public void handle(final CentralEvents.LostMessageEvent event) {
@@ -79,32 +69,9 @@ public class Middlerim extends AppCompatActivity {
     };
 
     private CentralEvents.Listener<CentralEvents.ReceivedTextEvent> receivedTextListener = new CentralEvents.Listener<CentralEvents.ReceivedTextEvent>() {
-        private boolean init = false;
-        private byte lastReveicedSequenceNo = Byte.MIN_VALUE;
-
         @Override
         public void handle(CentralEvents.ReceivedTextEvent event) {
-            int tag = buttonQueueIds.get(event.clientSequenceNo, -1);
-            if (tag == -1) {
-                return;
-            }
-            buttonQueueIds.delete(event.clientSequenceNo);
-            androidContext.buttonQueueManager().removeButton(tag);
-            if (init && (lastReveicedSequenceNo + 1) != event.clientSequenceNo) {
-                // Despite clientSequenceNo must be sequencial, it isn't. Some messages might be lost.
-                for (int i = lastReveicedSequenceNo; i < event.clientSequenceNo; i++) {
-                    int leftOverTag = buttonQueueIds.get(i, -1);
-                    if (leftOverTag == -1) {
-                        continue;
-                    }
-                    buttonQueueIds.delete(i);
-                    androidContext.buttonQueueManager().removeButton(leftOverTag);
-                }
-                LOG.warn("The message which sent just before the message which sent the time are not match. prev: "
-                        + lastReveicedSequenceNo + ", curr: " + event.clientSequenceNo);
-            }
-            lastReveicedSequenceNo = event.clientSequenceNo;
-            init = true;
+            androidContext.buttonQueueManager().removeButton(event.tag);
         }
     };
 
@@ -121,6 +88,11 @@ public class Middlerim extends AppCompatActivity {
         toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         setTitle("");
+
+        TypedValue tv = new TypedValue();
+        if (getTheme().resolveAttribute(android.R.attr.actionBarSize, tv, true)) {
+            actionBarHeight = TypedValue.complexToDimensionPixelSize(tv.data, getResources().getDisplayMetrics());
+        }
     }
 
     @Override
@@ -138,14 +110,12 @@ public class Middlerim extends AppCompatActivity {
         BackgroundService.onResumeForground(this);
         ViewEvents.onStatusChange(TAG + ".statusChangeEventListener", statusChangeEventListener);
         CentralEvents.onReceivedText(TAG + ".receivedTextListener", receivedTextListener);
-        CentralEvents.onSendMessage(TAG + ".sendMessageListener", sendMessageListener);
         ViewEvents.fireResume();
     }
 
     @Override
     protected void onPause() {
         ViewEvents.firePause();
-        CentralEvents.removeListener(TAG + ".sendMessageListener");
         CentralEvents.removeListener(TAG + ".receivedTextListener");
         ViewEvents.removeListener(TAG + ".statusChangeEventListener");
         BackgroundService.onPauseForground(this);
@@ -221,60 +191,11 @@ public class Middlerim extends AppCompatActivity {
 
     public void showToolbar() {
         toolbar.setTop(0);
-        toolbar.setBottom(originalToolbarHeight);
+        toolbar.setBottom(actionBarHeight);
         toolbar.setVisibility(View.VISIBLE);
     }
 
-    public void setToolbarHandler(View view) {
-        view.setOnTouchListener(new View.OnTouchListener() {
-            private boolean visible;
-            private float initialY = Float.MIN_VALUE;
-
-            @Override
-            public boolean onTouch(View v, MotionEvent event) {
-
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_MOVE:
-                        if (initialY == Float.MIN_VALUE) {
-                            if (originalToolbarHeight <= 0) {
-                                originalToolbarHeight = toolbar.getHeight();
-                            }
-                            visible = toolbar.getVisibility() == View.VISIBLE;
-                            if (!visible) {
-                                toolbar.setVisibility(View.VISIBLE);
-                                initialY = event.getY();
-                            } else {
-                                initialY = event.getY() - originalToolbarHeight;
-                            }
-                        }
-                        int delta = (int) (event.getY() - initialY);
-                        if (delta <= originalToolbarHeight) {
-                            toolbar.setTop(delta - originalToolbarHeight);
-                            toolbar.setBottom(delta);
-                        } else if (delta >= originalToolbarHeight && toolbar.getTop() != 0) {
-                            toolbar.setTop(0);
-                            toolbar.setBottom(originalToolbarHeight);
-                        }
-                        break;
-                    case MotionEvent.ACTION_UP:
-                        delta = (int) (event.getY() - initialY);
-                        if (!visible && delta >= originalToolbarHeight / 2) {
-                            toolbar.setTop(0);
-                            toolbar.setBottom(originalToolbarHeight);
-                        } else if (visible && delta <= originalToolbarHeight / 2) {
-                            toolbar.setBottom(0);
-                            toolbar.setVisibility(View.INVISIBLE);
-                        } else if (visible) {
-                            toolbar.setTop(0);
-                            toolbar.setBottom(originalToolbarHeight);
-                        } else {
-                            toolbar.setBottom(0);
-                            toolbar.setVisibility(View.INVISIBLE);
-                        }
-                        initialY = Float.MIN_VALUE;
-                }
-                return false;
-            }
-        });
+    public Toolbar getToolbar() {
+        return toolbar;
     }
 }

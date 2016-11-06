@@ -28,10 +28,12 @@ public class Text {
 
   public static class TextReceived implements Outbound {
 
-    private static final int FIXED_BYTE_SIZE = 6;
+    private static final int FIXED_BYTE_SIZE = 9;
 
+    private final int tag;
     private final int numberOfDelivery;
-    private TextReceived(int numberOfDelivery) {
+    private TextReceived(int tag, int numberOfDelivery) {
+      this.tag = tag;
       this.numberOfDelivery = numberOfDelivery;
     }
 
@@ -39,7 +41,7 @@ public class Text {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE)
           .writeByte(Headers.mask(Headers.RECEIVED, Headers.TEXT))
-          .writeByte(recipient.sessionId.clientSequenceNo())
+          .writeInt(tag)
           .writeInt(numberOfDelivery), recipient.address));
     }
 
@@ -50,15 +52,13 @@ public class Text {
   }
 
   public static class In implements Inbound {
-    private static int masterTag;
-
-    private final int tag;
+    public final int tag;
     public final byte displayNameLength;
     public final byte messageCommand;
     public final ByteBuffer data;
 
-    public In(byte displayNameLength, byte messageCommand, ByteBuffer data) {
-      this.tag = ++masterTag;
+    public In(int tag, byte displayNameLength, byte messageCommand, ByteBuffer data) {
+      this.tag = tag;
       this.displayNameLength = displayNameLength;
       this.messageCommand = messageCommand;
       this.data = data;
@@ -78,12 +78,12 @@ public class Text {
       Point point = Locations.findBySessionId(session.sessionId);
       if (point == null) {
         LOG.warn("Could not find a location for {}", session);
-        ctx.channel().write(new OutboundMessage<>(session, new TextReceived(0)));
+        ctx.channel().write(new OutboundMessage<>(session, new TextReceived(tag, 0)));
         return;
       }
       int dataLength = data.remaining();
       List<LocationStorage.Entry> recipients = findrecipients(session);
-      ctx.channel().write(new OutboundMessage<>(session, new TextReceived(recipients.size())));
+      ctx.channel().write(new OutboundMessage<>(session, new TextReceived(tag, recipients.size())));
       for (LocationStorage.Entry entry : recipients) {
         Session recipient = entry.session();
         ctx.channel().write(new OutboundMessage<>(recipient, new Out(tag, point, displayNameLength, messageCommand, data, dataLength)));
@@ -137,6 +137,9 @@ public class Text {
       return 17 + dataLength;
     }
 
+    /**
+     * Unique message ID by each message senders.
+     */
     @Override
     public int tag() {
       return tag;

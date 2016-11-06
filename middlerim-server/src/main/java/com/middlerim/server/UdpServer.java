@@ -11,15 +11,18 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.middlerim.message.Outbound;
 import com.middlerim.server.channel.InboundHandler;
 import com.middlerim.server.channel.OutboundHandler;
 import com.middlerim.server.channel.PacketToInboundDecoder;
 import com.middlerim.server.channel.ServerMessageSizeEstimator;
 import com.middlerim.server.message.Markers;
 import com.middlerim.server.message.OutboundMessage;
+import com.middlerim.server.storage.MessageListener;
+import com.middlerim.server.storage.Messages;
+import com.middlerim.server.storage.SessionListener;
 import com.middlerim.server.storage.Sessions;
 import com.middlerim.session.Session;
-import com.middlerim.session.SessionListener;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -92,6 +95,7 @@ public class UdpServer {
     closeFutures.add(bindFuture.channel().closeFuture());
     // closeFutures.add(b.bind(v6).channel().closeFuture());
     setSessionExpireListener(bindFuture.channel());
+    setMessageListener(bindFuture.channel());
     return bindFuture;
   }
 
@@ -103,6 +107,20 @@ public class UdpServer {
       @Override
       public void onExpire(Session oldSession, Session newSession) {
         channel.writeAndFlush(new OutboundMessage<>(newSession, Markers.UPDATE_AID));
+      }
+    });
+  }
+
+  private static void setMessageListener(final Channel channel) {
+    Messages.addListener(new MessageListener() {
+      @Override
+      public void unreached(long userId, Outbound message) {
+        Session session = Sessions.getSession(userId);
+        LOG.warn("The message is unreached to the client. message: {}, client: {}", message, session != null ? session : "(the session has been expired)");
+      }
+      @Override
+      public void retry(Session recipient, Outbound message) {
+        channel.writeAndFlush(new OutboundMessage<Outbound>(recipient, message));
       }
     });
   }

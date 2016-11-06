@@ -54,10 +54,10 @@ public class ConsoleClient {
     }
   };
 
-  private static MessagePool<Message> messagePool = new MessagePool<>(messagePoolAdaptor).startListen();
-
   public static class ConsoleContext extends ViewContext {
     private final File tmpDir = new File(".");
+    private MessagePool<Message> messagePool = new MessagePool<>(messagePoolAdaptor).startListen();
+
     @Override
     public File getCacheDir() {
       return tmpDir;
@@ -66,6 +66,11 @@ public class ConsoleClient {
     @Override
     public boolean isDebug() {
       return true;
+    }
+
+    @Override
+    public MessagePool<Message> getMessagePool() {
+      return messagePool;
     }
   }
 
@@ -88,7 +93,7 @@ public class ConsoleClient {
         receivedMessageCount++;
       }
     });
-    messagePool.onRemoved(new MessagePool.RemovedListener<Message>() {
+    c.messagePool.onRemoved(new MessagePool.RemovedListener<Message>() {
       @Override
       public void onRemoved(int i, Message message) {
         // System.out.println("Removed from local message buffer: " + message.userId);
@@ -102,10 +107,15 @@ public class ConsoleClient {
   private static void stressTest(final int limit) throws InterruptedException, ExecutionException, TimeoutException {
     long start = System.currentTimeMillis();
     final CountDownLatch c = new CountDownLatch(limit);
-    CentralEvents.onReceived("ConsoleClient.CentralEvents.Listener<CentralEvents.ReceivedEvent>", new CentralEvents.Listener<CentralEvents.ReceivedEvent>() {
+    CentralEvents.onReceivedText("ConsoleClient.CentralEvents.Listener<CentralEvents.ReceivedEvent>", new CentralEvents.Listener<CentralEvents.ReceivedTextEvent>() {
       @Override
-      public void handle(CentralEvents.ReceivedEvent event) {
+      public void handle(CentralEvents.ReceivedTextEvent event) {
         c.countDown();
+        try {
+          Thread.sleep(100);
+        } catch (InterruptedException e) {
+          // Ignore
+        }
         if (c.getCount() > 0) {
           final ByteBuffer buf = ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()});
           ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(80), buf);
@@ -115,7 +125,6 @@ public class ConsoleClient {
     ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()}));
     boolean result = c.await(10, TimeUnit.SECONDS);
     System.out.println((System.currentTimeMillis() - start) + "ms" + "[" + result + "]");
-    System.out.println("Received message count: " + receivedMessageCount);
   }
 
   public static void readConsole() throws Exception {

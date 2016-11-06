@@ -55,7 +55,9 @@ public class MainFragment extends Fragment implements ButtonQueueManager.Adopter
         OutboundSynchronizer.MessageAndContext<SequentialMessage> m;
         while ((m = leftOverMessages.poll()) != null) {
             if (m.message instanceof Text.Out) {
-                androidContext.buttonQueueManager().addButton(m.message.tag(), R.drawable.ic_sync_white_24px, FragmentManager.Page.MinuteMessage);
+                Bundle args = new Bundle();
+                args.putInt(MinuteMessageFragment.ARG_MESSAGE_TAG, m.message.tag());
+                androidContext.buttonQueueManager().addButton(m.message.tag(), R.drawable.ic_sync_white_24px, FragmentManager.Page.MinuteMessage, args);
             }
         }
     }

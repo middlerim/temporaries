@@ -113,19 +113,19 @@ public final class CentralEvents {
   }
 
   public static class ReceivedEvent implements Event {
-    public final byte clientSequenceNo;
+    public final int tag;
 
-    private ReceivedEvent(byte clientSequenceNo) {
-      this.clientSequenceNo = clientSequenceNo;
+    private ReceivedEvent(int tag) {
+      this.tag = tag;
     }
   }
 
   public static class ReceivedTextEvent implements Event {
-    public final byte clientSequenceNo;
+    public final int tag;
     public final int numberOfDelivery;
 
-    private ReceivedTextEvent(byte clientSequenceNo, int numberOfDelivery) {
-      this.clientSequenceNo = clientSequenceNo;
+    private ReceivedTextEvent(int tag, int numberOfDelivery) {
+      this.tag = tag;
       this.numberOfDelivery = numberOfDelivery;
     }
   }
@@ -145,12 +145,10 @@ public final class CentralEvents {
 
   public static class SendMessageEvent implements Event {
     public final int tag;
-    public final byte clientSequenceNo;
     public final String displayName;
     public final ByteBuffer message;
-    private SendMessageEvent(int tag, byte clientSequenceNo, String displayName, ByteBuffer message) {
+    private SendMessageEvent(int tag, String displayName, ByteBuffer message) {
       this.tag = tag;
-      this.clientSequenceNo = clientSequenceNo;
       this.displayName = displayName;
       this.message = message;
     }
@@ -178,19 +176,19 @@ public final class CentralEvents {
     handleEvent(new ReceiveMessageEvent(userId, location, displayName, message), receiveMessageListeners);
   }
 
-  public static void fireReceived(byte clientSequenceNo) {
-    handleEvent(new ReceivedEvent(clientSequenceNo), receivedListeners);
+  public static void fireReceived(int tag) {
+    handleEvent(new ReceivedEvent(tag), receivedListeners);
   }
 
-  public static void fireReceivedText(byte clientSequenceNo, int numberOfDelivery) {
-    handleEvent(new ReceivedTextEvent(clientSequenceNo, numberOfDelivery), receivedTextListeners);
+  public static void fireReceivedText(int tag, int numberOfDelivery) {
+    handleEvent(new ReceivedTextEvent(tag, numberOfDelivery), receivedTextListeners);
   }
 
   public static void fireLostMessage(SequentialMessage message, LostMessageEvent.Type type) {
     handleEvent(new LostMessageEvent(message, type), lostMessageListeners);
   }
 
-  public static void fireSendMessage(int tag, byte clientSequenceNo, String displayName, ByteBuffer messageBytes) {
-    handleEvent(new SendMessageEvent(tag, clientSequenceNo, displayName, messageBytes), sendMessageListeners);
+  public static void fireSendMessage(int tag, String displayName, ByteBuffer messageBytes) {
+    handleEvent(new SendMessageEvent(tag, displayName, messageBytes), sendMessageListeners);
   }
 }

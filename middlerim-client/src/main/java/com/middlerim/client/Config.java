@@ -12,4 +12,7 @@ public final class Config extends com.middlerim.Config {
   public static final int ALLOWABLE_MARGIN_LOCATION_METER = 10;
   public static final int ABANDONED_MESSAGE_THREASHOLD = 10;
   public static final int MAX_MESSAGE_CACHE_SIZE = 100;
+
+  public static final String KEY_KEEP_ALIVE_ENABLED = "middlerim.keep.alive";
+  public static final boolean KEEP_ALIVE_ENABLED = getBooleanValue(KEY_KEEP_ALIVE_ENABLED, true);
 }

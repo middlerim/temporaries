@@ -10,7 +10,6 @@ import com.middlerim.server.storage.location.SphericalPoint;
 import com.middlerim.server.storage.location.VpTree;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
-import com.middlerim.session.SessionListener;
 import com.middlerim.storage.persistent.FixedLayoutPersistentStorage;
 import com.middlerim.storage.persistent.StorageInformation;
 
@@ -31,7 +30,7 @@ public final class Locations {
     if (onMemory != null) {
       return onMemory.point();
     }
-    Session session = Sessions.getSession(sessionId);
+    Session session = Sessions.getSession(sessionId.userId());
     if (session == null) {
       return null;
     }

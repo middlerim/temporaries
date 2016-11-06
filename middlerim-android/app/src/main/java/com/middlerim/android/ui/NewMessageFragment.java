@@ -21,14 +21,15 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ScrollView;
 
+import com.middlerim.client.Config;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.server.MessageCommands;
 
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.Charset;
 import java.nio.charset.CharsetEncoder;
 import java.nio.charset.CoderResult;
+import java.util.Locale;
 
 public class NewMessageFragment extends Fragment {
     public static final String TAG = Middlerim.TAG + ".NewMsg";
@@ -38,7 +39,8 @@ public class NewMessageFragment extends Fragment {
     private String displayName = "仮名さん";
     private EditText editText;
     private ImageButton sendButton;
-    private CharsetEncoder encoder = Charset.forName("UTF-8").newEncoder();
+    private CharsetEncoder encoder = Config.MESSAGE_ENCODING.newEncoder();
+    private boolean isEnglishUser;
     private AndroidContext androidContext;
     private int radius;
 
@@ -47,6 +49,9 @@ public class NewMessageFragment extends Fragment {
                              Bundle savedInstanceState) {
         super.onCreateView(inflater, container, savedInstanceState);
         androidContext = AndroidContext.get(getActivity());
+        String language = Locale.getDefault().getLanguage();
+        isEnglishUser = language.startsWith("en");
+
         final View view = inflater.inflate(R.layout.fragment_new_message, container, false);
         editText = (EditText) view.findViewById(R.id.new_message);
 
@@ -209,22 +214,20 @@ public class NewMessageFragment extends Fragment {
         toggleSoftInput(false);
         getActivity().findViewById(R.id.button_new_message).setVisibility(View.VISIBLE);
 
-        if (editText.length() > 0) {
-            SharedPreferences.Editor prefEditor = androidContext.preferences().edit();
-            prefEditor.putString(Codes.PREF_EDITING_MESSAGE, editText.getText().subSequence(0, editText.length()).toString());
-            prefEditor.apply();
-        }
+        SharedPreferences.Editor prefEditor = androidContext.preferences().edit();
+        prefEditor.putString(Codes.PREF_EDITING_MESSAGE, editText.getText().subSequence(0, editText.length()).toString());
+        prefEditor.apply();
     }
 
     public void onSendMessageButtonClick(View view) {
         char[] cs = new char[editText.length()];
         editText.getText().getChars(0, editText.length(), cs, 0);
         CharBuffer charBuffer = CharBuffer.wrap(cs);
-
-        ByteBuffer buf = ByteBuffer.allocateDirect(charBuffer.length() * 2);
+        ByteBuffer buf = ByteBuffer.allocateDirect(isEnglishUser ? charBuffer.length() * 2 : charBuffer.length() * 4);
         encoder.reset();
         CoderResult r = encoder.encode(charBuffer, buf, true);
         if (r.isOverflow()) {
+            charBuffer.position(0);
             buf = ByteBuffer.allocateDirect(charBuffer.length() * 6);
             encoder.reset();
             r = encoder.encode(charBuffer, buf, true);
@@ -232,8 +235,12 @@ public class NewMessageFragment extends Fragment {
         buf.limit(buf.position());
         buf.position(0);
 
-        int tag = androidContext.buttonQueueManager().addButton(R.drawable.ic_sync_white_24px, FragmentManager.Page.MinuteMessage);
+        int tag = androidContext.nextMessageTag();
+        Bundle args = new Bundle();
+        args.putInt(MinuteMessageFragment.ARG_MESSAGE_TAG, tag);
+        androidContext.buttonQueueManager().addButton(tag, R.drawable.ic_sync_white_24px, FragmentManager.Page.MinuteMessage, args);
         ViewEvents.fireSubmitMessage(tag, displayName, MessageCommands.areaM(radius), buf);
+        editText.setText("");
         getActivity().onBackPressed();
     }
 }

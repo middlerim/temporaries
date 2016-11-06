@@ -13,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.middlerim.location.Point;
-import com.middlerim.message.Outbound;
 import com.middlerim.server.Config;
 import com.middlerim.server.Headers;
 import com.middlerim.server.message.Location;
@@ -21,10 +20,10 @@ import com.middlerim.server.message.Markers;
 import com.middlerim.server.message.OutboundMessage;
 import com.middlerim.server.message.Text;
 import com.middlerim.server.storage.Messages;
+import com.middlerim.server.storage.SessionListener;
 import com.middlerim.server.storage.Sessions;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
-import com.middlerim.session.SessionListener;
 import com.middlerim.token.TokenIssuer;
 
 import io.netty.buffer.ByteBuf;
@@ -57,7 +56,6 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
 
     byte[] tokenBytes = new byte[8];
     in.readBytes(tokenBytes);
-    // TODO Validate the token and convert to session ID
     SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
 
     if (header == Headers.EXIT) {
@@ -66,7 +64,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
         LOG.warn("Packet[EXIT]: Ignored(Invalid length). {}", in);
         return;
       }
-      Session session = Sessions.getSession(sessionId);
+      Session session = Sessions.getValidatedSession(sessionId);
       LOG.debug("Packet[EXIT]: {}", sessionId);
       if (session != null) {
         Sessions.remove(session);
@@ -76,42 +74,27 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
     if (header == Headers.ERROR) {
-      Session session = Sessions.getSession(sessionId);
+      Session session = Sessions.getValidatedSession(sessionId);
       if (session != null) {
         Sessions.remove(session);
       }
       LOG.error("Packet[ERROR]: Client is having unexpected error {}({})", session != null ? session : sessionId, msg.sender());
       return;
     }
-    if (header == Headers.AGAIN) {
-      if (in.readableBytes() > 0) {
-        // Invalid access.
-        LOG.warn("Packet[AGAIN]: Ignored(Invalid length). {}, {}", sessionId, in);
-        return;
-      }
-      Session session = Sessions.getSession(sessionId);
-      if (session == null) {
-        // Ignore the request.
-        LOG.warn("Packet[AGAIN]: Ignored(The session couldn't be found). {}", sessionId);
-        return;
-      }
-      session.address = msg.sender();
-      Outbound lastSentMessage = Messages.getMessage(session.sessionId.userId(), sessionId.serverSequenceNo());
-      if (lastSentMessage == null) {
-        LOG.warn("Packet[AGAIN]: Ignored(Message not found). {}", sessionId);
-        ctx.channel().write(new OutboundMessage<>(session, Markers.NOTFOUND));
-        return;
-      }
-      // Re-send the message.
-      LOG.debug("Packet[AGAIN]: {}", sessionId);
-      ctx.channel().write(new OutboundMessage<>(session, lastSentMessage));
-    } else if (Headers.isMasked(header, Headers.RECEIVED)) {
+
+    if (Headers.isMasked(header, Headers.RECEIVED)) {
       Messages.removeMessage(sessionId.userId(), sessionId.serverSequenceNo());
     }
+
     if (!Headers.hasData(header)) {
       return;
     }
+
     Session session = Sessions.getOrCreateSession(sessionId, msg.sender());
+    if (session == null) {
+      LOG.warn("The packet is discarded: {}", msg);
+      return;
+    }
     LOG.debug("Session for the packet: {}", session);
     if (!session.sessionId.equals(sessionId)) {
       session.sessionId.synchronizeClientWithServer((byte) (sessionId.clientSequenceNo() - 1));
@@ -122,7 +105,13 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
 
     ctx.channel().attr(AttributeKeys.SESSION).set(session);
 
+    // --- Handle non-sequential message.
+
     if (Headers.isMasked(header, Headers.LOCATION)) {
+      if (!session.sessionId.validateClient(sessionId)) {
+        LOG.warn("Packet[LOCATION] - {}: Ignored(Invalid session ID on client={}).", session, sessionId);
+        return;
+      }
       int latitude = in.readInt();
       int longtitude = in.readInt();
       if (in.readableBytes() > 0) {
@@ -135,22 +124,25 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       out.add(new Location(session.sessionId, point));
       return;
     }
+
+    // --- Handle Sequential message.
+
+    int tag = in.readInt();
     if (!session.sessionId.validateClientAndRefresh(sessionId)) {
-      // Must be sequential
+      // Must be sequential.
       if (session.sessionId.clientSequenceNo() == sessionId.clientSequenceNo()) {
         // Already received but the client hasn't received RECEIVED message yet.
         LOG.debug("Invalid sequenceNo - {}: Discard the packet, already received.", session);
-        ctx.channel().write(new OutboundMessage<>(session, Markers.RECEIVED));
+        ctx.channel().write(new OutboundMessage<>(session, new Markers.Received(tag)));
         return;
       } else {
         if (LOG.isDebugEnabled()) {
           LOG.debug("Invalid sequenceNo - {}: {} != {}", session, (byte) (session.sessionId.clientSequenceNo() + 1), sessionId.clientSequenceNo());
         }
-        ctx.channel().write(new OutboundMessage<>(session, Markers.INVALID_SEQUENCE));
+        ctx.channel().write(new OutboundMessage<>(session, new Markers.InvalidSequence(tag)));
         return;
       }
     }
-
     if (Headers.isMasked(header, Headers.FRAGMENT)) {
       int paylaadSize = in.readInt();
       int offset = in.readInt();
@@ -164,18 +156,19 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       if (buff == null) {
         buff = in.nioBuffer(in.readerIndex(), in.readableBytes());
       }
+
       if (Headers.isMasked(header, Headers.TEXT)) {
         byte messageCommand = buff.get();
         byte displayNameLength = buff.get();
-        LOG.debug("Packet[TEXT] - {}: {}", session, buff);
-        out.add(new Text.In(displayNameLength, messageCommand, buff.slice()));
+        LOG.debug("Packet[TEXT] - {}: tag={}, buff={}", session, tag, buff);
+        out.add(new Text.In(tag, displayNameLength, messageCommand, buff.slice()));
       }
     }
 
     // Send RECEIVED response when receiving message which implements SequencialMessage except TEXT.
     // When receiving TEXT message, TextReceived response is going to be sent instead.
     if (!Headers.isMasked(header, Headers.TEXT)) {
-      ctx.channel().writeAndFlush(new OutboundMessage<>(session, Markers.RECEIVED));
+      ctx.channel().writeAndFlush(new OutboundMessage<>(session, new Markers.Received(tag)));
     }
   }
 

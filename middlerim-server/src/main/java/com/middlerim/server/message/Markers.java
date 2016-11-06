@@ -12,23 +12,23 @@ public final class Markers {
   private Markers() {
   }
 
-  public static final Received RECEIVED = new Received();
-  public static final InvalidSequence INVALID_SEQUENCE = new InvalidSequence();
   public static final InvalidData INVALID_DATA = new InvalidData();
   public static final InvalidData NOTFOUND = new InvalidData();
   public static final AssignAID ASSIGN_AID = new AssignAID();
   public static final UpdateAID UPDATE_AID = new UpdateAID();
 
-  private static class Received implements Outbound {
+  public static class Received implements Outbound {
 
-    private static final int FIXED_BYTE_SIZE = 2;
+    private static final int FIXED_BYTE_SIZE = 5;
 
-    private Received() {
+    private final int tag;
+    public Received(int tag) {
+      this.tag = tag;
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.RECEIVED).writeByte(recipient.sessionId.clientSequenceNo()), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.RECEIVED).writeInt(tag), recipient.address));
     }
 
     @Override
@@ -37,16 +37,21 @@ public final class Markers {
     }
   }
 
-  private static final class InvalidSequence implements Outbound {
+  public static final class InvalidSequence implements Outbound {
 
-    private static final int FIXED_BYTE_SIZE = 2;
+    private static final int FIXED_BYTE_SIZE = 6;
 
-    private InvalidSequence() {
+    private final int tag;
+    public InvalidSequence(int tag) {
+      this.tag = tag;
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.AGAIN).writeByte(recipient.sessionId.clientSequenceNo()), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE)
+          .writeByte(Headers.AGAIN)
+          .writeByte(recipient.sessionId.clientSequenceNo())
+          .writeInt(tag), recipient.address));
     }
 
     @Override
@@ -92,7 +97,7 @@ public final class Markers {
       return FIXED_BYTE_SIZE;
     }
   }
-  
+
   private static final class UpdateAID implements Outbound {
 
     private static final int FIXED_BYTE_SIZE = 5;

@@ -14,15 +14,14 @@ public final class Markers {
   private Markers() {
   }
 
-  public static final Again AGAIN = new Again();
-  public static final Received RECEIVED = new Received();
   public static final InvalidData INVALID_DATA = new InvalidData();
   public static final Exit EXIT = new Exit();
   public static final AssignAID ASSIGN_AID = new AssignAID();
 
-  private static final class Again implements Inbound, Outbound {
-
-    private Again() {
+  public static final class Again implements Inbound, Outbound {
+    public final int tag;
+    public Again(int tag) {
+      this.tag = tag;
     }
 
     @Override
@@ -41,16 +40,18 @@ public final class Markers {
     }
   }
 
-  private static final class Received implements Outbound {
+  public static final class Received implements Outbound {
     private static final int FIXED_BYTE_SIZE = 9;
 
-    private Received() {
+    private final short serverSequenceNo;
+    public Received(short serverSequenceNo) {
+      this.serverSequenceNo = serverSequenceNo;
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       byte[] sessionId = new byte[8];
-      recipient.sessionId.readBytes(sessionId);
+      recipient.sessionId.copyWithNewServerSequenceNo(serverSequenceNo).readBytes(sessionId);
       return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.RECEIVED).writeBytes(sessionId), recipient.address));
     }
 

@@ -1,4 +1,6 @@
-package com.middlerim.session;
+package com.middlerim.server.storage;
+
+import com.middlerim.session.Session;
 
 public interface SessionListener {
 

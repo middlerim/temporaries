@@ -1,5 +1,6 @@
 package com.middlerim.android.ui;
 
+import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentTransaction;
@@ -123,18 +124,19 @@ public class FragmentManager {
         return true;
     }
 
-    public boolean openMinuteMessage() {
+    public boolean openMinuteMessage(Bundle args) {
         FragmentTransaction transaction = fm().beginTransaction();
         Fragment minuteMessage = openMinuteMessageFragment(transaction);
+        minuteMessage.setArguments(args);
         manageBackStack(transaction, minuteMessage);
         transaction.commit();
         return true;
     }
 
-    public void open(Page page) {
+    public void open(Page page, Bundle args) {
         switch (page) {
             case MinuteMessage:
-                openMinuteMessage();
+                openMinuteMessage(args);
                 break;
         }
     }

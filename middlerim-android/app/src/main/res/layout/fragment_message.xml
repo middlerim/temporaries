@@ -3,9 +3,9 @@
     android:id="@+id/fragment_message"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:layout_margin="4dp"
-    android:padding="4dp"
-    android:background="@color/blackTransparent">
+    android:layout_marginBottom="8dp"
+    android:background="@color/blackTransparent"
+    android:padding="4dp">
 
     <TextView
         android:id="@+id/display_name"

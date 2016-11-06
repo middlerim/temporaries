@@ -12,6 +12,10 @@ public final class Config extends com.middlerim.Config {
 
   public static final int MAX_MESSAGE_CACHE_SIZE = 1_000_000;
 
+  public static final int UNREACHED_MESSAGE_SURVIVAL_MINS = 5;
+  public static final int UNREACHED_MESSAGE_RETRY_PERIOD_MILLIS = 5000;
+  public static final int UNREACHED_MESSAGE_MAX_RETRY_COUNT = 3;
+
   public static final Charset CHARSET_MESSAGE = Charset.forName("utf-8");
 
   public static final boolean isUnix;

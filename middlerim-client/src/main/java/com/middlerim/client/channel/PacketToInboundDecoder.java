@@ -16,11 +16,11 @@ import org.slf4j.LoggerFactory;
 import com.middlerim.client.CentralEvents;
 import com.middlerim.client.Config;
 import com.middlerim.client.message.Markers;
-import com.middlerim.client.message.MessageLost;
 import com.middlerim.client.message.Text;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.client.view.ViewContext;
 import com.middlerim.location.Point;
+import com.middlerim.message.SequentialMessage;
 import com.middlerim.server.Headers;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
@@ -62,7 +62,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
       Sessions.setSession(Session.create(sessionId, Sessions.getSession().address));
       LOG.debug("Packet[ASSGIN_AID]: Received new anonymous session ID: {}", sessionId);
-      CentralEvents.fireReceived(SessionId.UNASSIGNED_SEQUENCE_NO);
+      CentralEvents.fireReceived(SequentialMessage.UNASSIGNED);
       return;
     }
     if (header == Headers.UPDATE_AID) {
@@ -84,30 +84,32 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (header == Headers.AGAIN) {
       // Synchronize sequenceNo on the client with central server.
       byte clientSequenceNo = in.readByte();
-      LOG.debug("Packet[AGAIN]:  clientSequenceNo on central server={}, on the client={}", clientSequenceNo, session.sessionId.clientSequenceNo());
+      int tag = in.readInt();
+      LOG.debug("Packet[AGAIN]: tag={}, clientSequenceNo on central server={}, on the client={}", tag, session.sessionId.clientSequenceNo());
       session.sessionId.synchronizeClientWithServer(clientSequenceNo);
-      out.add(Markers.AGAIN);
+      out.add(new Markers.Again(tag));
       return;
     }
 
     if (Headers.isMasked(header, Headers.RECEIVED)) {
-      byte clientSequenceNo = in.readByte();
-      LOG.debug("Packet[RECEIVED]: {}", clientSequenceNo);
-      CentralEvents.fireReceived(clientSequenceNo);
+      int tag = in.readInt();
+      LOG.debug("Packet[RECEIVED]: tag={}", tag);
+      CentralEvents.fireReceived(tag);
       if (Headers.isMasked(header, Headers.TEXT)) {
         int numberOfDelivery = in.readInt();
         LOG.debug("Packet[RECEIVED&TEXT]: {}", numberOfDelivery);
-        CentralEvents.fireReceivedText(clientSequenceNo, numberOfDelivery);
+        CentralEvents.fireReceivedText(tag, numberOfDelivery);
       }
       return;
     }
+
     short serverSequenceNo = in.readShort();
     if (!session.sessionId.validateServerSequenceNoAndRefresh(serverSequenceNo)) {
-      // Messages from server can be asynchronous. However, some messages are lost and will be requested.
-      LOG.debug("Invalid sequenceNo: {} != {}", (short) (session.sessionId.serverSequenceNo() + 1), serverSequenceNo);
-      ctx.channel().write(new MessageLost(session.sessionId.serverSequenceNo(), serverSequenceNo));
+      // This isn't an error. Messages from server can be asynchronous.
+      LOG.debug("The incoming message is not sequential. on client={} != on server={}. ", (short) (session.sessionId.serverSequenceNo() + 1), serverSequenceNo);
     }
-    ctx.channel().writeAndFlush(Markers.RECEIVED);
+
+    ctx.channel().writeAndFlush(new Markers.Received(serverSequenceNo));
 
     if (Headers.isMasked(header, Headers.FRAGMENT)) {
       int paylaadSize = in.readInt();
@@ -117,7 +119,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
     if (!Headers.isMasked(header, Headers.COMPLETE)) {
-      // Wait for completion of consuming all payload.
+      // Wait for completion of consuming all packets for the message.
     } else {
       ByteBuffer buff = fragmentedBufferMap.remove(session);
       if (buff == null) {

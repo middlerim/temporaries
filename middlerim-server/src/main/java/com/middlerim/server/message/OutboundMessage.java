@@ -18,8 +18,8 @@ public class OutboundMessage<M extends Outbound> {
   public ChannelFuture processOutput(ChannelHandlerContext ctx) {
     if (message instanceof SequentialMessage) {
       Messages.removeMessage(recipient.sessionId.userId(), recipient.sessionId.serverSequenceNo());
-      recipient.sessionId.incrementServerSequenceNo();
-      Messages.putMessage(recipient.sessionId.userId(), recipient.sessionId.serverSequenceNo(), message);
+      short serverSequenceNo = recipient.sessionId.incrementServerSequenceNo();
+      Messages.putMessage(recipient.sessionId.userId(), serverSequenceNo, message);
     }
     return message.processOutput(ctx, recipient);
   }

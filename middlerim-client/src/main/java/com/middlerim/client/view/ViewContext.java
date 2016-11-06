@@ -7,4 +7,6 @@ public abstract class ViewContext {
   public abstract File getCacheDir();
 
   public abstract boolean isDebug();
+  
+  public abstract MessagePool<?> getMessagePool();
 }

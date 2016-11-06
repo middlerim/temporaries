@@ -3,8 +3,8 @@ package com.middlerim.session;
 public final class SessionId {
   public static final SessionId ANONYMOUS = new SessionId(new byte[]{0, 0, 0, 0, 0, 0, 0, 0});
 
-  static final byte DEFAULT = 0;
-  static final byte NEW = 1;
+  public static final byte DEFAULT = 0;
+  public static final byte NEW = 1;
   byte status = 0;
 
   public static final long UNASSIGNED_USERID = 0;
@@ -64,6 +64,14 @@ public final class SessionId {
     return false;
   }
 
+  public boolean validateClient(SessionId sessionId) {
+    if (sessionId == ANONYMOUS
+        || (this.clientSequenceNo != sessionId.clientSequenceNo && (byte) (this.clientSequenceNo + 1) != sessionId.clientSequenceNo)) {
+      return false;
+    }
+    return true;
+  }
+
   public long userId() {
     if (userId < 0) {
       return MAX_USER_SIZE + userId + 1;
@@ -101,12 +109,12 @@ public final class SessionId {
     bytes[7] = (byte) serverSequenceNo;
   }
 
-  public void incrementClientSequenceNo() {
-    clientSequenceNo++;
+  public byte incrementClientSequenceNo() {
+    return ++clientSequenceNo;
   }
 
-  public void incrementServerSequenceNo() {
-    serverSequenceNo++;
+  public short incrementServerSequenceNo() {
+    return ++serverSequenceNo;
   }
 
   public SessionId copyWithNewUserId(byte[] userId) {

@@ -51,27 +51,29 @@ public class Text {
     private final byte[] displayNameBytes;
     public final byte messageCommand;
     public final ByteBuffer messageBytes;
+    private final int messageLength;
 
     public Out(int tag, String displayName, byte messageCommand, ByteBuffer messageBytes) {
       this.tag = tag;
       this.displayName = displayName;
       this.displayNameBytes = displayName.getBytes(Config.MESSAGE_ENCODING);
-      if (displayNameBytes.length > 40) {
-        throw new IllegalArgumentException("Display name must be up to 40 bytes");
+      if (displayNameBytes.length > Config.MAX_DISPLAY_NAME_BYTE_LENGTH) {
+        throw new IllegalArgumentException("Display name must be up to " + Config.MAX_DISPLAY_NAME_BYTE_LENGTH + " bytes");
       }
       this.messageCommand = messageCommand;
       this.messageBytes = messageBytes;
+      this.messageLength = messageBytes.remaining();
     }
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session session) {
       byte[] sessionIdBytes = new byte[8];
       session.sessionId.readBytes(sessionIdBytes);
-      final byte sequenceNo = session.sessionId.clientSequenceNo(); // copy
       int byteSize = byteSize();
       ByteBuf buf = ctx.alloc().buffer(byteSize, byteSize)
           .writeByte(Headers.mask(Headers.TEXT, Headers.COMPLETE))
           .writeBytes(sessionIdBytes)
+          .writeInt(tag)
           .writeByte(messageCommand)
           .writeByte((byte) (displayNameBytes.length))
           .writeBytes(displayNameBytes, 0, displayNameBytes.length)
@@ -83,7 +85,7 @@ public class Text {
         public void operationComplete(ChannelFuture future) throws Exception {
           ByteBuffer copy = messageBytes.duplicate();
           copy.position(0);
-          CentralEvents.fireSendMessage(tag, sequenceNo, displayName, copy);
+          CentralEvents.fireSendMessage(tag, displayName, copy);
         }
       });
       return cf;
@@ -91,7 +93,7 @@ public class Text {
 
     @Override
     public int byteSize() {
-      return 11 + displayNameBytes.length + messageBytes.remaining();
+      return 15 + displayNameBytes.length + messageLength;
     }
 
     @Override

@@ -88,7 +88,6 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     recipient.sessionId.incrementClientSequenceNo();
     LOG.debug("Sending the message " + next.message);
     return next.context.writeAndFlush(next.message);
-
   }
 
   public long averageMessageSentMillis() {
@@ -157,7 +156,13 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
   public void write(ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
     Outbound message = (Outbound) msg;
 
-    if (message == Markers.AGAIN) {
+    if (message instanceof Markers.Again) {
+      MessageAndContext<SequentialMessage> next = MESSAGE_QUEUE.peek();
+      int requestedTag = ((Markers.Again)message).tag;
+      if (next.message.tag() != requestedTag) {
+        LOG.warn("Invalid request from central server. requested tag={}, current tag={}", requestedTag, next.message.tag());
+        return;
+      }
       ChannelFuture againFuture = sendFromQueue();
       if (againFuture == null) {
         LOG.debug("Central Server request sending a message again, but the client doesn't have any message...");

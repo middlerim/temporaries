@@ -68,8 +68,12 @@ public class CentralServer {
     }
   };
   private static void runKeepingSessionAliveTimer(Channel channel) {
-    timer = new Timer(Config.INTERNAL_APP_NAME + "-keepAlive", true);
-    timer.schedule(new KeepAliveTask(channel), Config.SESSION_TIMEOUT_MILLIS, Config.SESSION_TIMEOUT_MILLIS - 10_000);
+    if (Config.KEEP_ALIVE_ENABLED) {
+      timer = new Timer(Config.INTERNAL_APP_NAME + "-keepAlive", true);
+      timer.schedule(new KeepAliveTask(channel), Config.SESSION_TIMEOUT_MILLIS, Config.SESSION_TIMEOUT_MILLIS - 10_000);
+    } else {
+      LOG.warn("Keep alive is disabled.");
+    }
   }
 
   private static void initializeChannelHandlers(ViewContext viewContext) {

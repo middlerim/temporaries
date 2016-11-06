@@ -18,7 +18,7 @@ public final class Headers {
   public static final byte RECEIVED = 0b0000010;
 
   /**
-   * Re-send previous message again.
+   * Re-send the previous message again from a client.
    */
   public static final byte AGAIN = 0b0000011;
 

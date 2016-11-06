@@ -1,6 +1,5 @@
 package com.middlerim.android.ui;
 
-import android.content.Context;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Handler;
@@ -9,37 +8,32 @@ import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
-import android.text.SpannableStringBuilder;
+import android.support.v7.widget.Toolbar;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.middlerim.client.Config;
 import com.middlerim.client.view.MessagePool;
-import com.middlerim.location.Coordinate;
 
-import java.io.File;
-import java.nio.ByteBuffer;
-import java.text.NumberFormat;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class StreamFragment extends Fragment {
     public static final String TAG = Middlerim.TAG + ".Stream";
-    private static final int ACTIVE = -1;
     private AndroidContext androidContext;
-    private RecyclerView view;
     private MessagePool<Message> messagePool;
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    private RecyclerView view;
+    private TextView footer;
 
-    private int pauseAt = ACTIVE;
+    private int pauseAt;
+    private int recyclerViewItemSize;
 
     private static class ViewHolder extends RecyclerView.ViewHolder {
         final View view;
         final TextView displayName;
         final TextView message;
         final TextView numberOfDelivery;
-        Message item;
 
         public ViewHolder(View view) {
             super(view);
@@ -56,38 +50,46 @@ public class StreamFragment extends Fragment {
     }
 
     private RecyclerView.Adapter<ViewHolder> viewAdapter = new RecyclerView.Adapter<ViewHolder>() {
+
+
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             View view = LayoutInflater.from(parent.getContext())
                     .inflate(R.layout.fragment_message, parent, false);
+
+            view.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Bundle args = new Bundle();
+                    int index = (int) v.getTag();
+                    args.putInt(MinuteMessageFragment.ARG_MESSAGE_INDEX, index);
+                    androidContext.fragmentManager().openMinuteMessage(args);
+                }
+            });
             return new ViewHolder(view);
         }
 
         @Override
-        public void onBindViewHolder(final ViewHolder holder, int position) {
+        public void onBindViewHolder(ViewHolder holder, int position) {
             Message msg = messagePool.get(position);
             if (msg == null) {
+                holder.view.setVisibility(View.GONE);
                 return;
             }
-            holder.item = msg;
-            holder.displayName.setText(holder.item.displayName);
-            holder.message.setText(holder.item.message);
-            if (holder.item.numberOfDelivery != null) {
-                holder.numberOfDelivery.setText(holder.item.numberOfDelivery);
+            holder.displayName.setText(msg.displayName);
+            holder.message.setText(msg.message);
+            if (msg.numberOfDelivery != null) {
+                holder.numberOfDelivery.setText(msg.numberOfDelivery);
             } else {
                 holder.numberOfDelivery.setVisibility(View.INVISIBLE);
             }
-            holder.view.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    System.out.println(holder);
-                }
-            });
+            holder.view.setTag(position);
+            holder.view.setVisibility(View.VISIBLE);
         }
 
         @Override
         public int getItemCount() {
-            return messagePool.size();
+            return recyclerViewItemSize;
         }
     };
 
@@ -95,90 +97,116 @@ public class StreamFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         androidContext = AndroidContext.get(getActivity());
-        messagePool = new MessagePool<>(10, new MessagePool.Adapter<Message>() {
-            @Override
-            public Message onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
-                byte[] bs = new byte[message.remaining()];
-                message.get(bs);
-                SpannableStringBuilder sb = new SpannableStringBuilder(new String(bs, Config.MESSAGE_ENCODING));
-                Message msg = new Message(userId, location, displayName, sb, numberOfDelivery);
-                viewAdapter.notifyItemInserted(messagePool.size());
-                return msg;
-            }
-
-            @Override
-            public File storage() {
-                return new File(getContext().getFilesDir(), "messages");
-            }
-        });
-        int latestMessageSize = androidContext.preferences().getInt(Codes.PREF_LATEST_MESSAGE_SIZE, -1);
-        if (latestMessageSize >= 0) {
-            messagePool.loadLatestMessages(latestMessageSize);
-        }
-        messagePool.startListen();
+        messagePool = androidContext.getMessagePool();
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        messagePool.stopListen();
-        androidContext.preferences().edit().putInt(Codes.PREF_LATEST_MESSAGE_SIZE, messagePool.size()).apply();
-        messagePool.close();
+    private boolean isFirstItemDisplaying(RecyclerView view) {
+        if (messagePool.size() > messagePool.capacity()) {
+            int firstVisibleItemPosition = ((LinearLayoutManager) view.getLayoutManager()).findFirstCompletelyVisibleItemPosition();
+            if (firstVisibleItemPosition != RecyclerView.NO_POSITION && firstVisibleItemPosition < messagePool.size() - messagePool.capacity())
+                return false;
+        }
+        return true;
     }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        view = (RecyclerView) inflater.inflate(R.layout.fragment_stream, container, false);
-
-        Context context = view.getContext();
-        view.setLayoutManager(new LinearLayoutManager(context));
+        View wrapper = inflater.inflate(R.layout.fragment_stream, container, false);
+        view = (RecyclerView) wrapper.findViewById(R.id.stream);
+        footer = (TextView) wrapper.findViewById(R.id.stream_footer);
+        view.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.VERTICAL, false));
         view.setHasFixedSize(true);
         view.setAdapter(viewAdapter);
-        androidContext.getActivity().setToolbarHandler(view);
-        return view;
+        view.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                footer.setVisibility(View.INVISIBLE);
+            }
+        });
+        Toolbar toolbar = androidContext.getActivity().getToolbar();
+        view.setOnTouchListener(new SynchronisedScrollTouchListener(toolbar) {
+            private float scrollStartY;
+            private boolean enabled = true;
+
+            @Override
+            public boolean onTouch(View v, MotionEvent event) {
+                super.onTouch(v, event);
+
+                switch (event.getAction()) {
+                    case MotionEvent.ACTION_DOWN:
+                        scrollStartY = event.getY();
+                        return false;
+                    case MotionEvent.ACTION_MOVE:
+                        if (scrollStartY < event.getY()) {
+                            if (enabled && !isFirstItemDisplaying(view)) {
+                                enabled = false;
+                            }
+                            if (!enabled) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    case MotionEvent.ACTION_UP:
+                        if (!enabled) {
+                            enabled = true;
+                            View item = view.getLayoutManager().findViewByPosition(messagePool.size() - messagePool.capacity() - 1);
+                            if (item == null) {
+                                return false;
+                            }
+                            final int firstItemY = (int) item.getTop();
+                            view.postDelayed(new Runnable() {
+                                @Override
+                                public void run() {
+                                    view.smoothScrollBy(0, firstItemY);
+                                }
+                            }, 100);
+                            return true;
+                        }
+                }
+                return false;
+            }
+        });
+        return wrapper;
     }
 
     @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
-        if (hidden) {
-            pauseAt = messagePool.size();
-        } else {
-            int p = pauseAt;
-            pauseAt = ACTIVE;
-            if (p != ACTIVE && p != messagePool.size()) {
-                Resources res = getResources();
-                String text = res.getString(R.string.info_unread_messages, messagePool.size() - p);
-                final Toast toast = Toast.makeText(getContext(), text, Toast.LENGTH_SHORT);
-                toast.show();
-            }
-        }
+        onViewToggled(!hidden);
     }
 
-    public static class Message {
-        private static NumberFormat numberFormat = NumberFormat.getIntegerInstance();
+    @Override
+    public void onResume() {
+        super.onResume();
+        onViewToggled(true);
+    }
 
-        public final long userId;
-        public final Coordinate location;
-        public final String displayName;
-        public final CharSequence message;
-        public final String numberOfDelivery;
+    @Override
+    public void onPause() {
+        super.onPause();
+        onViewToggled(false);
+    }
 
-        public Message(long userId, Coordinate location, String displayName, CharSequence message, int numberOfDelivery) {
-            this.userId = userId;
-            this.location = location;
-            this.displayName = displayName;
-            this.message = message;
-            if (numberOfDelivery >= 0) {
-                this.numberOfDelivery = numberFormat.format(numberOfDelivery);
-            } else {
-                this.numberOfDelivery = null;
-            }
-        }
-
-        @Override
-        public String toString() {
-            return "user ID: " + userId + ", location: " + location + ", displayName: " + displayName + ", message: " + message + ", number of delivery: " + numberOfDelivery;
+    private void onViewToggled(boolean show) {
+        if (show) {
+            final int p = pauseAt;
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    recyclerViewItemSize = messagePool.size();
+                    if (p != recyclerViewItemSize) {
+                        viewAdapter.notifyItemRangeInserted(p, messagePool.size() - p);
+                        Resources res = getResources();
+                        String text = res.getString(R.string.info_unread_messages, messagePool.size() - p);
+                        footer.setText(text);
+                        footer.setVisibility(View.VISIBLE);
+                    } else {
+                        footer.setVisibility(View.INVISIBLE);
+                    }
+                }
+            }, 100);
+        } else {
+            pauseAt = messagePool.size();
         }
     }
 }
