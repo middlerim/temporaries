@@ -2,8 +2,6 @@ package com.middlerim.android.ui;
 
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
@@ -16,8 +14,6 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.middlerim.client.view.MessagePool;
-
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class StreamFragment extends Fragment {
     public static final String TAG = Middlerim.TAG + ".Stream";
@@ -100,13 +96,36 @@ public class StreamFragment extends Fragment {
         messagePool = androidContext.getMessagePool();
     }
 
-    private boolean isFirstItemDisplaying(RecyclerView view) {
-        if (messagePool.size() > messagePool.capacity()) {
-            int firstVisibleItemPosition = ((LinearLayoutManager) view.getLayoutManager()).findFirstCompletelyVisibleItemPosition();
-            if (firstVisibleItemPosition != RecyclerView.NO_POSITION && firstVisibleItemPosition < messagePool.size() - messagePool.capacity())
-                return false;
+    private boolean scrolling;
+
+    private void scrollToFirstItemIfNeeded() {
+        if (scrolling) {
+            return;
         }
-        return true;
+        scrolling = true;
+        scrollToFirstItemIfNeeded0();
+    }
+
+    private void scrollToFirstItemIfNeeded0() {
+        view.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                final int firstVisibleItemPosition = ((LinearLayoutManager) view.getLayoutManager()).findFirstVisibleItemPosition();
+                if (firstVisibleItemPosition == RecyclerView.NO_POSITION || view.getScrollState() != RecyclerView.SCROLL_STATE_IDLE) {
+                    view.postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            scrollToFirstItemIfNeeded0();
+                        }
+                    }, 10);
+                    return;
+                }
+                if (firstVisibleItemPosition < messagePool.size() - messagePool.capacity()) {
+                    view.smoothScrollToPosition(messagePool.size() - messagePool.capacity());
+                }
+                scrolling = false;
+            }
+        }, 10);
     }
 
     @Override
@@ -114,19 +133,12 @@ public class StreamFragment extends Fragment {
         View wrapper = inflater.inflate(R.layout.fragment_stream, container, false);
         view = (RecyclerView) wrapper.findViewById(R.id.stream);
         footer = (TextView) wrapper.findViewById(R.id.stream_footer);
-        view.setLayoutManager(new LinearLayoutManager(getContext(), LinearLayoutManager.VERTICAL, false));
+        view.setLayoutManager(new LinearLayoutManagerWithSmoothScroller(getContext(), LinearLayoutManager.VERTICAL, false));
         view.setHasFixedSize(true);
         view.setAdapter(viewAdapter);
-        view.addOnScrollListener(new RecyclerView.OnScrollListener() {
-            @Override
-            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
-                footer.setVisibility(View.INVISIBLE);
-            }
-        });
         Toolbar toolbar = androidContext.getActivity().getToolbar();
         view.setOnTouchListener(new SynchronisedScrollTouchListener(toolbar) {
-            private float scrollStartY;
-            private boolean enabled = true;
+            private float threshold = Float.MAX_VALUE;
 
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -134,34 +146,20 @@ public class StreamFragment extends Fragment {
 
                 switch (event.getAction()) {
                     case MotionEvent.ACTION_DOWN:
-                        scrollStartY = event.getY();
-                        return false;
                     case MotionEvent.ACTION_MOVE:
-                        if (scrollStartY < event.getY()) {
-                            if (enabled && !isFirstItemDisplaying(view)) {
-                                enabled = false;
-                            }
-                            if (!enabled) {
+                        if (threshold == Float.MAX_VALUE) {
+                            footer.setVisibility(View.INVISIBLE);
+                            int firstVisibleItemPosition = ((LinearLayoutManager) view.getLayoutManager()).findFirstVisibleItemPosition();
+                            if (firstVisibleItemPosition < messagePool.size() - messagePool.capacity()) {
+                                view.onInterceptTouchEvent(event);
+                                threshold = event.getY();
                                 return true;
                             }
                         }
-                        return false;
+                        return threshold < event.getY();
                     case MotionEvent.ACTION_UP:
-                        if (!enabled) {
-                            enabled = true;
-                            View item = view.getLayoutManager().findViewByPosition(messagePool.size() - messagePool.capacity() - 1);
-                            if (item == null) {
-                                return false;
-                            }
-                            final int firstItemY = (int) item.getTop();
-                            view.postDelayed(new Runnable() {
-                                @Override
-                                public void run() {
-                                    view.smoothScrollBy(0, firstItemY);
-                                }
-                            }, 100);
-                            return true;
-                        }
+                        threshold = Float.MAX_VALUE;
+                        scrollToFirstItemIfNeeded();
                 }
                 return false;
             }
@@ -190,12 +188,12 @@ public class StreamFragment extends Fragment {
     private void onViewToggled(boolean show) {
         if (show) {
             final int p = pauseAt;
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            view.postDelayed(new Runnable() {
                 @Override
                 public void run() {
                     recyclerViewItemSize = messagePool.size();
                     if (p != recyclerViewItemSize) {
-                        viewAdapter.notifyItemRangeInserted(p, messagePool.size() - p);
+                        viewAdapter.notifyItemRangeInserted(p, messagePool.size());
                         Resources res = getResources();
                         String text = res.getString(R.string.info_unread_messages, messagePool.size() - p);
                         footer.setText(text);
@@ -203,8 +201,9 @@ public class StreamFragment extends Fragment {
                     } else {
                         footer.setVisibility(View.INVISIBLE);
                     }
+                    scrollToFirstItemIfNeeded();
                 }
-            }, 100);
+            }, 200);
         } else {
             pauseAt = messagePool.size();
         }
