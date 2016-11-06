@@ -23,13 +23,13 @@
     <!-- Example General settings -->
     <string name="pref_header_general">General</string>
 
-    <string name="pref_title_social_recommendations">Enable social recommendations</string>
-    <string name="pref_description_social_recommendations">Recommendations for people to contact
-        based on your message history
+    <string name="pref_title_running_background">常にメッセージを受けとる</string>
+    <string name="pref_description_running_background">
+        有効にするとアプリを閉じているときも新しいメッセージを受けとります。
     </string>
 
-    <string name="pref_title_display_name">Display name</string>
-    <string name="pref_default_display_name">John Smith</string>
+    <string name="pref_title_display_name">名前を変える</string>
+    <string name="pref_default_display_name">名無しさん</string>
 
     <string name="pref_title_add_friends_to_messages">Add friends to messages</string>
     <string-array name="pref_example_list_titles">

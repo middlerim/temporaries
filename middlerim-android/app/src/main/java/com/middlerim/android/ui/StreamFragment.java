@@ -13,6 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import com.middlerim.client.CentralEvents;
 import com.middlerim.client.view.MessagePool;
 
 public class StreamFragment extends Fragment {
@@ -94,6 +95,13 @@ public class StreamFragment extends Fragment {
         super.onCreate(savedInstanceState);
         androidContext = AndroidContext.get(getActivity());
         messagePool = androidContext.getMessagePool();
+        messagePool.onAdded(new MessagePool.AddedListener<Message>() {
+            @Override
+            public void onAdded(final int index, Message message) {
+                recyclerViewItemSize = messagePool.size();
+                viewAdapter.notifyItemInserted(recyclerViewItemSize);
+            }
+        });
     }
 
     private boolean scrolling;

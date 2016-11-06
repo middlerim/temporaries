@@ -1,48 +1,41 @@
 package com.middlerim.android.ui;
 
-import android.content.Intent;
 import android.os.Bundle;
-import android.support.v4.app.FragmentTransaction;
+import android.support.v7.preference.Preference;
 import android.support.v7.preference.PreferenceFragmentCompat;
-import android.view.MenuItem;
 
 public class GeneralPreferenceFragment extends PreferenceFragmentCompat {
     public static final String TAG = Middlerim.TAG + ".PREF";
 
-    public static boolean open(Middlerim activity) {
-        GeneralPreferenceFragment fragment = (GeneralPreferenceFragment) activity.getSupportFragmentManager().findFragmentByTag(TAG);
-        if (fragment == null) {
-            fragment = new GeneralPreferenceFragment();
-        } else if (fragment.isVisible()) {
-            return false;
-        }
-        FragmentTransaction transaction = activity.getSupportFragmentManager().beginTransaction();
-        transaction.add(fragment, TAG);
-        transaction.addToBackStack(null);
-        transaction.commit();
-        return true;
-    }
+    private AndroidContext context;
 
     @Override
     public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
-        ((Middlerim) getActivity()).getSupportActionBar().hide();
+        context = AndroidContext.get(getContext());
+        context.getActivity().getSupportActionBar().hide();
         addPreferencesFromResource(R.xml.pref_general);
-        setHasOptionsMenu(true);
+
+        findPreference("background_mode").setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                boolean backgroundMode = Boolean.valueOf(newValue.toString());
+
+                return true;
+            }
+        });
+        findPreference("display_name").setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
+            @Override
+            public boolean onPreferenceChange(Preference preference, Object newValue) {
+                String displayName = newValue.toString();
+                context.preferences().edit().putString(Codes.PREF_DISPLAY_NAME, displayName).apply();
+                return true;
+            }
+        });
     }
 
     @Override
     public void onDetach() {
         super.onDetach();
-        ((Middlerim) getActivity()).getSupportActionBar().show();
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        if (id == android.R.id.home) {
-            startActivity(new Intent(getActivity(), Middlerim.class));
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
+        context.getActivity().getSupportActionBar().show();
     }
 }

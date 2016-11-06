@@ -6,6 +6,7 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.os.Bundle;
 import android.support.v4.app.Fragment;
+import android.support.v7.preference.PreferenceManager;
 import android.text.Editable;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -20,6 +21,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ScrollView;
+import android.widget.TextView;
 
 import com.middlerim.client.Config;
 import com.middlerim.client.view.ViewEvents;
@@ -36,7 +38,7 @@ public class NewMessageFragment extends Fragment {
 
     private static final int MAX_LENGTH = 1560;
 
-    private String displayName = "仮名さん";
+    private TextView displayName;
     private EditText editText;
     private ImageButton sendButton;
     private CharsetEncoder encoder = Config.MESSAGE_ENCODING.newEncoder();
@@ -53,6 +55,7 @@ public class NewMessageFragment extends Fragment {
         isEnglishUser = language.startsWith("en");
 
         final View view = inflater.inflate(R.layout.fragment_new_message, container, false);
+        displayName = (TextView) view.findViewById(R.id.new_message_display_name);
         editText = (EditText) view.findViewById(R.id.new_message);
 
         editText.addTextChangedListener(new TextWatcher() {
@@ -124,6 +127,11 @@ public class NewMessageFragment extends Fragment {
         return view;
     }
 
+    private void setDisplayName() {
+        String username = androidContext.preferences().getString(Codes.PREF_DISPLAY_NAME, getResources().getString(R.string.pref_default_display_name));
+        displayName.setText(username);
+    }
+
     @Override
     public void onResume() {
         super.onResume();
@@ -137,6 +145,7 @@ public class NewMessageFragment extends Fragment {
         }
         onEdit(editText.getText().subSequence(0, editText.length()), 0, -1);
         androidContext.getActivity().showToolbar();
+        setDisplayName();
         toggleSoftInput(true);
     }
 
@@ -196,6 +205,10 @@ public class NewMessageFragment extends Fragment {
     @Override
     public void onHiddenChanged(boolean hidden) {
         super.onHiddenChanged(hidden);
+        if (!hidden) {
+            setDisplayName();
+        }
+        toggleSoftInput(!hidden);
     }
 
     private void toggleSoftInput(boolean show) {
@@ -239,7 +252,7 @@ public class NewMessageFragment extends Fragment {
         Bundle args = new Bundle();
         args.putInt(MinuteMessageFragment.ARG_MESSAGE_TAG, tag);
         androidContext.buttonQueueManager().addButton(tag, R.drawable.ic_sync_white_24px, FragmentManager.Page.MinuteMessage, args);
-        ViewEvents.fireSubmitMessage(tag, displayName, MessageCommands.areaM(radius), buf);
+        ViewEvents.fireSubmitMessage(tag, displayName.getText().toString(), MessageCommands.areaM(radius), buf);
         editText.setText("");
         getActivity().onBackPressed();
     }

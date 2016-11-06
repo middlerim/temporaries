@@ -4,9 +4,6 @@ import android.os.Bundle;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentTransaction;
-import android.view.View;
-
-import com.middlerim.client.view.ViewEvents;
 
 import java.util.ArrayDeque;
 
@@ -76,6 +73,10 @@ public class FragmentManager {
         return (MinuteMessageFragment) fm().findFragmentByTag(MinuteMessageFragment.TAG);
     }
 
+    public GeneralPreferenceFragment getGeneralPreferenceFragment() {
+        return (GeneralPreferenceFragment) fm().findFragmentByTag(GeneralPreferenceFragment.TAG);
+    }
+
     private void manageBackStack(FragmentTransaction transaction, Fragment... newFragments) {
         Fragment[] currentFragments = fragmentstack.peek();
         fragmentstack.push(newFragments);
@@ -126,9 +127,19 @@ public class FragmentManager {
 
     public boolean openMinuteMessage(Bundle args) {
         FragmentTransaction transaction = fm().beginTransaction();
+        Fragment map = openMapFragment(transaction);
+        Fragment main = openMainFragment(transaction);
         Fragment minuteMessage = openMinuteMessageFragment(transaction);
         minuteMessage.setArguments(args);
-        manageBackStack(transaction, minuteMessage);
+        manageBackStack(transaction, map, main, minuteMessage);
+        transaction.commit();
+        return true;
+    }
+
+    public boolean openGeneralPreference() {
+        FragmentTransaction transaction = fm().beginTransaction();
+        Fragment generalPreference = openGeneralPreferenceFragment(transaction);
+        manageBackStack(transaction, generalPreference);
         transaction.commit();
         return true;
     }
@@ -202,6 +213,17 @@ public class FragmentManager {
         if (fragment == null) {
             fragment = new AreaSelectorFragment();
             transaction.add(R.id.middlerim, fragment, AreaSelectorFragment.TAG);
+        } else if (!fragment.isVisible()) {
+            transaction.show(fragment);
+        }
+        return fragment;
+    }
+
+    private GeneralPreferenceFragment openGeneralPreferenceFragment(FragmentTransaction transaction) {
+        GeneralPreferenceFragment fragment = getGeneralPreferenceFragment();
+        if (fragment == null) {
+            fragment = new GeneralPreferenceFragment();
+            transaction.add(R.id.middlerim, fragment, GeneralPreferenceFragment.TAG);
         } else if (!fragment.isVisible()) {
             transaction.show(fragment);
         }

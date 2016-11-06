@@ -12,6 +12,7 @@ final class Codes {
     public static final int STATUS_CHANGE_GPS_ENABLED = 2;
 
 
+    public static final String PREF_DISPLAY_NAME = "DISPLAY_NAME";
     public static final String PREF_EDITING_MESSAGE = "EDITING_MESSAGE";
     public static final String PREF_AREA_PROGRESS = "AREA_PROGRESS";
     public static final String PREF_AREA_RADIUS = "AREA_RADIUS";

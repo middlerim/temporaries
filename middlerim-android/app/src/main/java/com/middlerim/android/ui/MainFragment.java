@@ -77,7 +77,7 @@ public class MainFragment extends Fragment implements ButtonQueueManager.Adopter
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.action_settings:
-                //GeneralPreferenceFragment.open(getActivity());
+                androidContext.fragmentManager().openGeneralPreference();
                 return true;
             case R.id.action_signIn:
                 //SignInFragment.open(this);

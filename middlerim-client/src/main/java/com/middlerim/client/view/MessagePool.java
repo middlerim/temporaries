@@ -3,7 +3,9 @@ package com.middlerim.client.view;
 import java.io.Closeable;
 import java.io.File;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
@@ -26,6 +28,10 @@ public class MessagePool<T> implements Closeable {
   public interface Adapter<T> {
     T onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery);
     File storage();
+  }
+
+  public interface AddedListener<T> {
+    void onAdded(int index, T message);
   }
 
   public interface RemovedListener<T> {
@@ -63,7 +69,8 @@ public class MessagePool<T> implements Closeable {
   private Object[] pool;
 
   private Adapter<T> adapter;
-  private RemovedListener<T> removedListener;
+  private List<RemovedListener<T>> removedListeners = new ArrayList<>(2);
+  private List<AddedListener<T>> addedListeners = new ArrayList<>(2);
   private int size;
   private int last;
   private final int capacity;
@@ -111,11 +118,16 @@ public class MessagePool<T> implements Closeable {
       last = 0;
     }
     Object old = pool[last];
-    if (old != null && removedListener != null) {
-      removedListener.onRemoved(size - capacity, (T) old);
+    if (old != null) {
+      for (RemovedListener<T> l : removedListeners) {
+        l.onRemoved(size - capacity, (T) old);
+      }
     }
     size++;
     pool[last++] = elem;
+    for (AddedListener<T> l : addedListeners) {
+      l.onAdded(size - 1, (T) elem);
+    }
   }
 
   public int capacity() {
@@ -132,8 +144,12 @@ public class MessagePool<T> implements Closeable {
     addLast(adapter.onReceive(userId, location, displayName, message, numberOfDelivery));
   }
 
+  public void onAdded(AddedListener<T> listener) {
+    this.addedListeners.add(listener);
+  }
+
   public void onRemoved(RemovedListener<T> listener) {
-    this.removedListener = listener;
+    this.removedListeners.add(listener);
   }
 
   public MessagePool<T> startListen() {
