@@ -1,6 +1,6 @@
 package com.middlerim.client.session;
 
-import com.middlerim.client.CentralServer;
+import com.middlerim.client.Config;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 
@@ -8,7 +8,7 @@ public class Sessions {
   private volatile static Session singleton;
 
   public static Session setAnonymous() {
-    singleton = Session.create(SessionId.ANONYMOUS, CentralServer.serverIPv4Address);
+    singleton = Session.create(SessionId.ANONYMOUS, Config.COMMAND_SERVER_IPV4);
     return singleton;
   }
 

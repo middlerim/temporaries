@@ -2,7 +2,7 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 
 dependencies {
-    compile project(':middlerim-server')
+    compile project(':middlerim-command-server')
     compile project(':middlerim-client')
     compile 'org.slf4j:slf4j-api:1.7.21'
     compile 'ch.qos.logback:logback-classic:1.1.5'

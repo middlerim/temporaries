@@ -14,14 +14,3 @@ dependencies {
   compile 'ch.qos.logback:logback-classic:1.1.5'
   testCompile 'junit:junit:4.12'
 }
-
-task fatJar(type: Jar) {
-  manifest {
-    attributes 'Implementation-Title': 'Middlerim Embedded Server',
-          'Implementation-Version': version,
-          'Main-Class': 'com.middlerim.server.UdpServer'
-  }
-  baseName = project.name + '-all'
-  from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
-  with jar
-}

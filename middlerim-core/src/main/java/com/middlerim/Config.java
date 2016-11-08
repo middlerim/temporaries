@@ -1,13 +1,21 @@
 package com.middlerim;
 
+import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 
-public abstract class Config {
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-  public static boolean TEST = true;
+public abstract class Config {
+  private static final Logger LOG = LoggerFactory.getLogger("mdlrm");
 
   public static final String INTERNAL_APP_NAME = "mdlrm";
-  public static final int MAX_PACKET_SIZE = 1280;
+  public static final boolean PRODUCTION = getBooleanValue("middlerim.production", false);
+  public static final boolean TEST = !PRODUCTION;
+
+  // < 1280 to prevent IP fragmentation
+  public static final int MAX_COMMAND_BYTE = 1280;
+  public static final int MAX_MEDIA_MESSAGE_BYTE = 2_560_000;
   public static final int MAX_DISPLAY_NAME_BYTE_LENGTH = 46;
   public static final Charset MESSAGE_ENCODING = Charset.forName("utf-8");
 
@@ -19,6 +27,13 @@ public abstract class Config {
   public static final int SESSIONID_RENEW_CYCLE_MILLIS = getIntValue("middlerim.sessionid.renew.cycle.millis", 60 * 60 * 1000);
   public static final String KEY_SESSION_TIMEOUT_MILLIS = "middlerim.session.timeout.millis";
   public static final int SESSION_TIMEOUT_MILLIS = getIntValue(KEY_SESSION_TIMEOUT_MILLIS, 30 * 60 * 1000);
+
+  public static final InetSocketAddress COMMAND_SERVER_IPV4 = new InetSocketAddress(Config.CENTRAL_SERVER_IPV4_HOST, Config.CENTRAL_SERVER_IPV4_PORT);
+
+  static {
+    LOG.info("SESSIONID_RENEW_CYCLE_MILLIS={}", SESSIONID_RENEW_CYCLE_MILLIS);
+    LOG.info("SESSION_TIMEOUT_MILLIS={}", SESSION_TIMEOUT_MILLIS);
+  }
 
   protected static boolean getBooleanValue(String envKey, boolean defaultValue) {
     String value = getSystemValue(envKey);

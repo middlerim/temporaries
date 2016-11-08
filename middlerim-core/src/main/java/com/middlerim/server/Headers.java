@@ -47,16 +47,6 @@ public final class Headers {
    */
   public static final byte TEXT = 0b0010000;
 
-  /**
-   * Fragment mask.
-   */
-  public static final byte FRAGMENT = 0b0100000;
-
-  /**
-   * Completed sending all payload mask.
-   */
-  public static final byte COMPLETE = 0b1000000;
-
   public static byte mask(byte... headers) {
     byte b = headers[0];
     for (int i = 1; i < headers.length; i++) {

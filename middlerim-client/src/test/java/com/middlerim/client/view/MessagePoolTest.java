@@ -14,7 +14,7 @@ import java.util.Random;
 import org.junit.Before;
 import org.junit.Test;
 
-import com.middlerim.client.CentralEvents;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.location.Coordinate;
 
 public class MessagePoolTest {

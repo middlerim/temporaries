@@ -14,16 +14,17 @@ import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.middlerim.client.CentralEvents;
-import com.middlerim.client.CentralServer;
+import com.middlerim.client.Config;
+import com.middlerim.client.central.CentralEvents;
+import com.middlerim.client.central.CentralServer;
 import com.middlerim.client.message.Location;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.location.Coordinate;
 import com.middlerim.location.Point;
 import com.middlerim.server.Headers;
-import com.middlerim.server.UdpServer;
-import com.middlerim.server.storage.Locations;
+import com.middlerim.server.command.CommandServer;
+import com.middlerim.server.command.storage.Locations;
 import com.middlerim.session.SessionId;
 import com.middlerim.token.TokenIssuer;
 import com.middlerim.util.Bytes;
@@ -36,6 +37,7 @@ import io.netty.channel.ChannelFutureListener;
 public abstract class End2EndTest {
   private static final Logger LOG = LoggerFactory.getLogger(End2EndTest.class);
   protected static IntegrationContext ctx;
+  private static CommandServer commandServer;
 
   public static void run() throws Exception {
     ctx = new IntegrationContext();
@@ -45,7 +47,8 @@ public abstract class End2EndTest {
 
       @Override
       public void run() {
-        UdpServer.runEmbedded();
+        commandServer = new CommandServer();
+        commandServer.runEmbedded();
         latch.countDown();
       }
     }, "CentralServer").run();
@@ -84,7 +87,7 @@ public abstract class End2EndTest {
     if (CentralServer.isStarted()) {
       ViewEvents.fireDestroy();
     }
-    UdpServer.shutdown();
+    commandServer.shutdown();
   }
 
   @Before
@@ -108,7 +111,7 @@ public abstract class End2EndTest {
     DatagramSocket clientSocket = null;
     try {
       clientSocket = new DatagramSocket();
-      DatagramPacket assingAidPacket = new DatagramPacket(new byte[]{Headers.ASSIGN_AID}, 1, CentralServer.serverIPv4Address);
+      DatagramPacket assingAidPacket = new DatagramPacket(new byte[]{Headers.ASSIGN_AID}, 1, Config.COMMAND_SERVER_IPV4);
       clientSocket.send(assingAidPacket);
       byte[] receivedData = new byte[9];
       DatagramPacket receivePacket = new DatagramPacket(receivedData, receivedData.length);
@@ -136,7 +139,7 @@ public abstract class End2EndTest {
           .writeBytes(sessionIdBytes)
           .writeInt(point.latitude)
           .writeInt(point.longitude).array();
-      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, CentralServer.serverIPv4Address);
+      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, Config.COMMAND_SERVER_IPV4);
       clientSocket.send(assingAidPacket);
       Thread.sleep(50);
       LOG.debug("Set location {} for the dummy user {}", location, sessionId);
@@ -159,14 +162,14 @@ public abstract class End2EndTest {
       sessionId.readBytes(sessionIdBytes);
 
       byte[] data = Unpooled.buffer(15)
-          .writeByte(Headers.mask(Headers.TEXT, Headers.COMPLETE))
+          .writeByte(Headers.TEXT)
           .writeBytes(sessionIdBytes)
           .writeInt(tag++)
           .writeByte(messageCommand)
           .writeByte((byte) 2)
           .writeChar('あ')
           .writeChar('い').array();
-      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, CentralServer.serverIPv4Address);
+      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, Config.COMMAND_SERVER_IPV4);
       clientSocket.send(assingAidPacket);
       byte[] receivedData = new byte[9];
       DatagramPacket receivePacket = new DatagramPacket(receivedData, receivedData.length);

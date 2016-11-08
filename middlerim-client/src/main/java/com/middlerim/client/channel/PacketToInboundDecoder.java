@@ -1,20 +1,13 @@
 package com.middlerim.client.channel;
 
-import java.io.File;
-import java.io.RandomAccessFile;
 import java.nio.BufferUnderflowException;
-import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.middlerim.client.CentralEvents;
 import com.middlerim.client.Config;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.client.message.Markers;
 import com.middlerim.client.message.Text;
 import com.middlerim.client.session.Sessions;
@@ -35,7 +28,6 @@ import io.netty.handler.codec.MessageToMessageDecoder;
 public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPacket> {
   private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
 
-  private static Map<Session, ByteBuffer> fragmentedBufferMap = new ConcurrentHashMap<>();
   private final ViewContext viewContext;
 
   public PacketToInboundDecoder(ViewContext viewContext) {
@@ -111,51 +103,20 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
 
     ctx.channel().writeAndFlush(new Markers.Received(serverSequenceNo));
 
-    if (Headers.isMasked(header, Headers.FRAGMENT)) {
-      int paylaadSize = in.readInt();
-      int offset = in.readInt();
-      LOG.debug("Packet[FRAGMENT]: {}/{}", offset, paylaadSize);
-      consumePayload(session, paylaadSize, offset, in);
-      return;
-    }
-    if (!Headers.isMasked(header, Headers.COMPLETE)) {
-      // Wait for completion of consuming all packets for the message.
-    } else {
-      ByteBuffer buff = fragmentedBufferMap.remove(session);
-      if (buff == null) {
-        buff = in.nioBuffer(in.readerIndex(), in.readableBytes());
+    if (Headers.isMasked(header, Headers.TEXT)) {
+      byte[] userIdBytes = new byte[4];
+      in.readBytes(userIdBytes);
+      int latitude = in.readInt();
+      int longtitude = in.readInt();
+      byte displayNameLength = in.readByte();
+      byte messageCommand = in.readByte();
+      if (in.readableBytes() <= displayNameLength) {
+        LOG.warn("Received insufficient data. data length need at least {} but actually it's {}", displayNameLength, in.readableBytes());
+        return;
       }
-      if (Headers.isMasked(header, Headers.TEXT)) {
-        byte[] userIdBytes = new byte[4];
-        buff.get(userIdBytes);
-        int latitude = buff.getInt();
-        int longtitude = buff.getInt();
-        byte displayNameLength = buff.get();
-        byte messageCommand = buff.get();
-        if (buff.remaining() <= displayNameLength) {
-          LOG.warn("Received insufficient data. data length need at least {} but actually it's {}", displayNameLength, buff.remaining());
-          return;
-        }
-        LOG.debug("Packet[TEXT]: {}", buff);
-        out.add(new Text.In(Bytes.intToLong(userIdBytes), new Point(latitude, longtitude).toCoordinate(), displayNameLength, messageCommand, buff.slice()));
-      }
+      LOG.debug("Packet[TEXT]: {}", in);
+      out.add(new Text.In(Bytes.intToLong(userIdBytes), new Point(latitude, longtitude).toCoordinate(), displayNameLength, messageCommand, in.nioBuffer()));
     }
-  }
-
-  private void consumePayload(Session session, int payloadSize, int offset, ByteBuf in) throws Exception {
-    ByteBuffer cached = fragmentedBufferMap.get(session);
-    if (cached == null) {
-      if (payloadSize > 10000000) {
-        cached = new RandomAccessFile(
-            new File(viewContext.getCacheDir(), "mddilerim-" + session.sessionId + ".dat"), "rw")
-                .getChannel().map(FileChannel.MapMode.READ_WRITE, 0, payloadSize);
-      } else {
-        cached = MappedByteBuffer.allocate(payloadSize);
-      }
-      fragmentedBufferMap.put(session, cached);
-    }
-    cached.position(offset);
-    in.getBytes(0, cached);
   }
 
   @Override

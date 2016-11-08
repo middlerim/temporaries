@@ -7,8 +7,8 @@ import java.util.TimerTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.middlerim.client.CentralEvents;
 import com.middlerim.client.Config;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.client.message.Markers;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.client.view.ViewEvents;

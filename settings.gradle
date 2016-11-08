@@ -1,1 +1,1 @@
-include 'middlerim-core', 'middlerim-filestorage', 'middlerim-server', 'middlerim-client', 'middlerim-integration', 'middlerim-admin'
+include 'middlerim-core', 'middlerim-filestorage', 'middlerim-server', 'middlerim-command-server', 'middlerim-smallmedia-server', 'middlerim-client', 'middlerim-integration', 'middlerim-admin'

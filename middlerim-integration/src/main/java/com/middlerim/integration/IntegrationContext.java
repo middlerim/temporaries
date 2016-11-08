@@ -2,7 +2,7 @@ package com.middlerim.integration;
 
 import java.io.File;
 
-import com.middlerim.client.CentralEvents;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.client.view.MessagePool;
 import com.middlerim.client.view.ViewContext;
 

@@ -11,9 +11,9 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-import com.middlerim.client.CentralEvents;
-import com.middlerim.client.CentralServer;
 import com.middlerim.client.Config;
+import com.middlerim.client.central.CentralEvents;
+import com.middlerim.client.central.CentralServer;
 import com.middlerim.client.view.MessagePool;
 import com.middlerim.client.view.ViewContext;
 import com.middlerim.client.view.ViewEvents;

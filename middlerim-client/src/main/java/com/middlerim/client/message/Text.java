@@ -2,8 +2,8 @@ package com.middlerim.client.message;
 
 import java.nio.ByteBuffer;
 
-import com.middlerim.client.CentralEvents;
 import com.middlerim.client.Config;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.location.Coordinate;
 import com.middlerim.message.Inbound;
 import com.middlerim.message.Outbound;
@@ -71,7 +71,7 @@ public class Text {
       session.sessionId.readBytes(sessionIdBytes);
       int byteSize = byteSize();
       ByteBuf buf = ctx.alloc().buffer(byteSize, byteSize)
-          .writeByte(Headers.mask(Headers.TEXT, Headers.COMPLETE))
+          .writeByte(Headers.TEXT)
           .writeBytes(sessionIdBytes)
           .writeInt(tag)
           .writeByte(messageCommand)

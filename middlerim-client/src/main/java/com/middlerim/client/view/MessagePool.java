@@ -12,7 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.middlerim.Config;
-import com.middlerim.client.CentralEvents;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.location.Coordinate;
 import com.middlerim.location.Point;

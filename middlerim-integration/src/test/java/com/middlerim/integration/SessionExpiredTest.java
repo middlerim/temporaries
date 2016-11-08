@@ -4,12 +4,15 @@ import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
 
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import com.middlerim.client.Config;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.session.Session;
 
+// It's needed to run separately.
+@Ignore
 public class SessionExpiredTest extends End2EndTest {
 
   @BeforeClass
