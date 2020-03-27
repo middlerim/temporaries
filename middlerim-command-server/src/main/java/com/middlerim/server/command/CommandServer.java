@@ -8,23 +8,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.middlerim.message.Outbound;
-import com.middlerim.server.Config;
 import com.middlerim.server.Server;
-import com.middlerim.server.command.channel.InboundHandler;
-import com.middlerim.server.command.channel.OutboundHandler;
-import com.middlerim.server.command.channel.PacketToInboundDecoder;
-import com.middlerim.server.command.channel.ServerMessageSizeEstimator;
-import com.middlerim.server.command.message.Markers;
-import com.middlerim.server.command.message.OutboundMessage;
+import com.middlerim.server.channel.InboundHandler;
+import com.middlerim.server.channel.OutboundHandler;
+import com.middlerim.server.channel.ServerMessageSizeEstimator;
+import com.middlerim.server.command.channel.CommandHandler;
 import com.middlerim.server.command.storage.MessageListener;
 import com.middlerim.server.command.storage.Messages;
-import com.middlerim.server.command.storage.SessionListener;
-import com.middlerim.server.command.storage.Sessions;
+import com.middlerim.server.message.Markers;
+import com.middlerim.server.message.OutboundMessage;
+import com.middlerim.server.storage.SessionListener;
+import com.middlerim.server.storage.Sessions;
 import com.middlerim.session.Session;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -34,22 +34,18 @@ import io.netty.channel.socket.DatagramChannel;
 
 public class CommandServer extends Server {
   private static final Logger LOG = LoggerFactory.getLogger(CommandServer.class);
-  private final ChannelHandler[] sharedHandlers = new ChannelHandler[]{new PacketToInboundDecoder(), new InboundHandler(), new OutboundHandler()};
+  private final ChannelHandler[] sharedHandlers = new ChannelHandler[]{new CommandHandler(), new InboundHandler(), new OutboundHandler()};
 
-  private final InetSocketAddress v4;
-  // private final InetSocketAddress v6;
-  private final int maximumPacketSize;
-  
   private Channel channelV4;
-
-  public CommandServer() {
-    this(Config.CENTRAL_SERVER_IPV4_HOST, Config.CENTRAL_SERVER_IPV4_PORT, Config.CENTRAL_SERVER_IPV6_HOST, Config.CENTRAL_SERVER_IPV6_PORT, Config.MAX_COMMAND_BYTE);
-  }
-
-  public CommandServer(String hostV4, int portV4, String hostV6, int portV6, int maximumPacketSize) {
-    this.v4 = new InetSocketAddress(hostV4, portV4);
-    // this.v6 = new InetSocketAddress(hostV6, portV6);
-    this.maximumPacketSize = maximumPacketSize;
+  private Channel channelV6;
+  private Channel channel(InetSocketAddress address) {
+    if (address == Config.COMMAND_SERVER_IPV4) {
+      return channelV4;
+    } else if (address == Config.COMMAND_SERVER_IPV6) {
+      return channelV6;
+    } else {
+      throw new IllegalStateException("Unknown address: " + address);
+    }
   }
 
   private void setSessionExpireListener() {
@@ -59,7 +55,7 @@ public class CommandServer extends Server {
       }
       @Override
       public void onExpire(Session oldSession, Session newSession) {
-        channelV4.writeAndFlush(new OutboundMessage<>(newSession, Markers.UPDATE_AID));
+        channel(newSession.address).writeAndFlush(new OutboundMessage<>(newSession, Markers.UPDATE_AID));
       }
     });
   }
@@ -73,7 +69,7 @@ public class CommandServer extends Server {
       }
       @Override
       public void retry(Session recipient, Outbound message) {
-        channelV4.writeAndFlush(new OutboundMessage<Outbound>(recipient, message));
+        channel(recipient.address).writeAndFlush(new OutboundMessage<Outbound>(recipient, message));
       }
     });
   }
@@ -95,15 +91,27 @@ public class CommandServer extends Server {
           }
         });
     b.option(ChannelOption.SO_REUSEADDR, true);
-    b.option(ChannelOption.SO_SNDBUF, maximumPacketSize * 1000);
-    b.option(ChannelOption.SO_RCVBUF, maximumPacketSize * 1000);
+    b.option(ChannelOption.SO_SNDBUF, Config.MAX_COMMAND_BYTE * 1000);
+    b.option(ChannelOption.SO_RCVBUF, Config.MAX_COMMAND_BYTE * 1000);
     b.option(ChannelOption.MESSAGE_SIZE_ESTIMATOR, new ServerMessageSizeEstimator());
-    b.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(maximumPacketSize));
+    b.option(ChannelOption.RCVBUF_ALLOCATOR, new FixedRecvByteBufAllocator(Config.MAX_COMMAND_BYTE));
 
     List<ChannelFuture> futures = new ArrayList<>(2);
-    futures.add(b.bind(v4));
+    futures.add(b.bind(Config.COMMAND_SERVER_IPV4).addListener(new ChannelFutureListener() {
 
-    // closeFutures.add(b.bind(v6).channel().closeFuture());
+      @Override
+      public void operationComplete(ChannelFuture future) throws Exception {
+        channelV4 = future.channel();
+      }
+    }));
+    futures.add(b.bind(Config.COMMAND_SERVER_IPV6).addListener(new ChannelFutureListener() {
+
+      @Override
+      public void operationComplete(ChannelFuture future) throws Exception {
+        channelV6 = future.channel();
+      }
+    }));
+
     setSessionExpireListener();
     setMessageListener();
     return futures;

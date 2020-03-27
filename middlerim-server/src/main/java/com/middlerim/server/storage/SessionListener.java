@@ -1,4 +1,4 @@
-package com.middlerim.server.command.storage;
+package com.middlerim.server.storage;
 
 import com.middlerim.session.Session;
 

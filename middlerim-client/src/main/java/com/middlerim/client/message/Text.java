@@ -1,7 +1,5 @@
 package com.middlerim.client.message;
 
-import java.nio.ByteBuffer;
-
 import com.middlerim.client.Config;
 import com.middlerim.client.central.CentralEvents;
 import com.middlerim.location.Coordinate;
@@ -25,9 +23,9 @@ public class Text {
     public final Coordinate location;
     public final int displayNameLength;
     public final byte messageCommand;
-    public final ByteBuffer data;
+    public final ByteBuf data;
 
-    public In(long userId, Coordinate location, int displayNameLength, byte messageCommand, ByteBuffer data) {
+    public In(long userId, Coordinate location, int displayNameLength, byte messageCommand, ByteBuf data) {
       this.userId = userId;
       this.location = location;
       this.displayNameLength = displayNameLength;
@@ -37,10 +35,14 @@ public class Text {
 
     @Override
     public void processInput(ChannelHandlerContext ctx) {
-      byte[] displayNameBytes = new byte[displayNameLength];
-      data.get(displayNameBytes);
-      String displayName = new String(displayNameBytes, Config.MESSAGE_ENCODING);
-      CentralEvents.fireReceiveMessage(userId, location, displayName, data.slice());
+      try {
+        byte[] displayNameBytes = new byte[displayNameLength];
+        data.readBytes(displayNameBytes);
+        String displayName = new String(displayNameBytes, Config.MESSAGE_ENCODING);
+        CentralEvents.fireReceiveMessage(userId, location, displayName, data.slice());
+      } finally {
+        data.release();
+      }
     }
   }
 
@@ -50,10 +52,9 @@ public class Text {
     public final String displayName;
     private final byte[] displayNameBytes;
     public final byte messageCommand;
-    public final ByteBuffer messageBytes;
-    private final int messageLength;
+    public final byte[] messageBytes;
 
-    public Out(int tag, String displayName, byte messageCommand, ByteBuffer messageBytes) {
+    public Out(int tag, String displayName, byte messageCommand, byte[] messageBytes) {
       this.tag = tag;
       this.displayName = displayName;
       this.displayNameBytes = displayName.getBytes(Config.MESSAGE_ENCODING);
@@ -61,8 +62,10 @@ public class Text {
         throw new IllegalArgumentException("Display name must be up to " + Config.MAX_DISPLAY_NAME_BYTE_LENGTH + " bytes");
       }
       this.messageCommand = messageCommand;
+      if (messageBytes.length > Config.MAX_TEXT_BYTES) {
+        throw new IllegalArgumentException("Message must be up to " + Config.MAX_TEXT_BYTES + " bytes");
+      }
       this.messageBytes = messageBytes;
-      this.messageLength = messageBytes.remaining();
     }
 
     @Override
@@ -71,7 +74,7 @@ public class Text {
       session.sessionId.readBytes(sessionIdBytes);
       int byteSize = byteSize();
       ByteBuf buf = ctx.alloc().buffer(byteSize, byteSize)
-          .writeByte(Headers.TEXT)
+          .writeByte(Headers.Command.TEXT.code)
           .writeBytes(sessionIdBytes)
           .writeInt(tag)
           .writeByte(messageCommand)
@@ -83,9 +86,7 @@ public class Text {
 
         @Override
         public void operationComplete(ChannelFuture future) throws Exception {
-          ByteBuffer copy = messageBytes.duplicate();
-          copy.position(0);
-          CentralEvents.fireSendMessage(tag, displayName, copy);
+          CentralEvents.fireSendMessage(tag, displayName, messageBytes);
         }
       });
       return cf;
@@ -93,7 +94,7 @@ public class Text {
 
     @Override
     public int byteSize() {
-      return 15 + displayNameBytes.length + messageLength;
+      return 15 + displayNameBytes.length + messageBytes.length;
     }
 
     @Override

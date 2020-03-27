@@ -15,6 +15,7 @@ import com.middlerim.client.view.ViewContext;
 import com.middlerim.location.Point;
 import com.middlerim.message.SequentialMessage;
 import com.middlerim.server.Headers;
+import com.middlerim.server.Headers.Header;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.token.TokenIssuer;
@@ -41,8 +42,8 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (!in.isReadable()) {
       return;
     }
-    byte header = in.readByte();
-    if (header == Headers.ASSIGN_AID) {
+    Header header = Headers.parse(in.readByte());
+    if (header == Headers.Control.ASSIGN_AID) {
       Session session = Sessions.getSession();
       if (!session.isNotAssigned()) {
         // Already assigned. It happens because it's not synchronizing while ASSIGN_AID is being requested.
@@ -57,7 +58,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       CentralEvents.fireReceived(SequentialMessage.UNASSIGNED);
       return;
     }
-    if (header == Headers.UPDATE_AID) {
+    if (header == Headers.Control.UPDATE_AID) {
       byte[] userIdBytes = new byte[4];
       in.readBytes(userIdBytes);
       SessionId sessionId = Sessions.getSession().sessionId.copyWithNewUserId(userIdBytes);
@@ -73,7 +74,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
 
-    if (header == Headers.AGAIN) {
+    if (header == Headers.Control.AGAIN) {
       // Synchronize sequenceNo on the client with central server.
       byte clientSequenceNo = in.readByte();
       int tag = in.readInt();
@@ -83,15 +84,18 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
 
-    if (Headers.isMasked(header, Headers.RECEIVED)) {
+    if (header == Headers.Control.RECEIVED) {
       int tag = in.readInt();
       LOG.debug("Packet[RECEIVED]: tag={}", tag);
       CentralEvents.fireReceived(tag);
-      if (Headers.isMasked(header, Headers.TEXT)) {
-        int numberOfDelivery = in.readInt();
-        LOG.debug("Packet[RECEIVED&TEXT]: {}", numberOfDelivery);
-        CentralEvents.fireReceivedText(tag, numberOfDelivery);
-      }
+      return;
+    }
+    if (header == Headers.Command.TEXT_RECEIVED) {
+      int tag = in.readInt();
+      int numberOfDelivery = in.readInt();
+      LOG.debug("Packet[RECEIVED&TEXT]: {}", numberOfDelivery);
+      CentralEvents.fireReceived(tag);
+      CentralEvents.fireReceivedText(tag, numberOfDelivery);
       return;
     }
 
@@ -103,7 +107,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
 
     ctx.channel().writeAndFlush(new Markers.Received(serverSequenceNo));
 
-    if (Headers.isMasked(header, Headers.TEXT)) {
+    if (header == Headers.Command.TEXT) {
       byte[] userIdBytes = new byte[4];
       in.readBytes(userIdBytes);
       int latitude = in.readInt();
@@ -115,7 +119,8 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
         return;
       }
       LOG.debug("Packet[TEXT]: {}", in);
-      out.add(new Text.In(Bytes.intToLong(userIdBytes), new Point(latitude, longtitude).toCoordinate(), displayNameLength, messageCommand, in.nioBuffer()));
+      out.add(new Text.In(Bytes.intToLong(userIdBytes), new Point(latitude, longtitude).toCoordinate(), displayNameLength, messageCommand, in.retain()));
+      return;
     }
   }
 

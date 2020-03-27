@@ -1,6 +1,7 @@
 package com.middlerim.client.central;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayDeque;
 import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
@@ -10,6 +11,7 @@ import com.middlerim.client.Config;
 import com.middlerim.client.channel.InboundHandler;
 import com.middlerim.client.channel.OutboundHandler;
 import com.middlerim.client.channel.OutboundSynchronizer;
+import com.middlerim.client.channel.OutboundSynchronizer.MessageAndContext;
 import com.middlerim.client.channel.PacketToInboundDecoder;
 import com.middlerim.client.message.Location;
 import com.middlerim.client.message.Markers;
@@ -18,6 +20,7 @@ import com.middlerim.client.view.ViewContext;
 import com.middlerim.client.view.ViewEvents;
 import com.middlerim.location.Point;
 import com.middlerim.message.Outbound;
+import com.middlerim.message.SequentialMessage;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
@@ -48,6 +51,7 @@ public final class CommandServer implements ChannelPoolHandler {
   private static Point lastLocation;
 
   private static Channel channel;
+  private static OutboundSynchronizer outboundSynchronizer;
 
   public static Channel channel() {
     return channel;
@@ -66,11 +70,12 @@ public final class CommandServer implements ChannelPoolHandler {
   }
 
   private static void initializeChannelHandlers(Channel ch) {
+    outboundSynchronizer = new OutboundSynchronizer();
     ChannelHandler[] handlers = new ChannelHandler[]{
         // In
         new PacketToInboundDecoder(viewContext), new InboundHandler(),
         // Out
-        new OutboundHandler(), new OutboundSynchronizer()};
+        new OutboundHandler(), outboundSynchronizer};
 
     ch.pipeline().addLast(handlers);
   }
@@ -85,28 +90,32 @@ public final class CommandServer implements ChannelPoolHandler {
   }
 
   public static ChannelFuture listen(Bootstrap b) {
-    pool = new SimpleChannelPool(b.remoteAddress(Config.COMMAND_SERVER_IPV4), new CommandServer());
+    pool = new SimpleChannelPool(b.remoteAddress(Config.COMMAND_SERVER), new CommandServer());
 
     // Keep 1 channel for listening global events.
     Future<?> future = pool.acquire().addListener(new FutureListener<Channel>() {
       @Override
       public void operationComplete(Future<Channel> f) throws Exception {
-        if (f.isSuccess()) {
+        if (f.cause() == null) {
           channel = f.getNow();
           initializeEventListeners();
           runKeepingSessionAliveTimer();
         } else {
-          throw new RuntimeException(f.cause());
+          CentralEvents.fireError("E_001", f.cause());
+          LOG.error("Channel initialing error", f.cause());
         }
       }
     });
     try {
       boolean result = future.await(1000);
       if (!result) {
-        throw new RuntimeException("Could not find message server: " + Config.COMMAND_SERVER_IPV4);
+        throw new RuntimeException("Could not find the command server: " + Config.COMMAND_SERVER);
+      }
+      if (!future.isSuccess()) {
+        throw new RuntimeException("Could not find the command server: " + Config.COMMAND_SERVER, future.cause());
       }
     } catch (InterruptedException e) {
-      throw new RuntimeException("Could not find message server: " + Config.COMMAND_SERVER_IPV4, e);
+      throw new RuntimeException("Could not find the command server: " + Config.COMMAND_SERVER, e);
     }
     return channel.bind(new InetSocketAddress(0));
   }
@@ -124,6 +133,7 @@ public final class CommandServer implements ChannelPoolHandler {
               public void operationComplete(ChannelFuture f2) throws Exception {
                 if (!f2.isSuccess()) {
                   CentralEvents.fireError("E_001", f2.cause());
+                  LOG.error("Could not exit.", f2.cause());
                 }
                 CentralServer.shutdown();
               }
@@ -181,7 +191,7 @@ public final class CommandServer implements ChannelPoolHandler {
       }
       channel.writeAndFlush(new Location(lastLocation));
       lastTouchMillis = System.currentTimeMillis();
-      LOG.debug("Sent keep-alive signal to the central server.");
+      LOG.debug("Sent keep-alive signal to the command server.");
     }
   };
 
@@ -191,6 +201,13 @@ public final class CommandServer implements ChannelPoolHandler {
     } else {
       LOG.warn("Keep alive is disabled.");
     }
+  }
+
+  public static ArrayDeque<MessageAndContext<SequentialMessage>> getMessageQueue() {
+    if (outboundSynchronizer == null) {
+      return new ArrayDeque<>(0);
+    }
+    return outboundSynchronizer.getMessageQueue();
   }
 
   private static class ClientMessageSizeEstimator implements MessageSizeEstimator {

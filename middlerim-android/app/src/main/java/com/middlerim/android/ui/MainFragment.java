@@ -16,6 +16,7 @@ import android.view.animation.RotateAnimation;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 
+import com.middlerim.client.central.CommandServer;
 import com.middlerim.client.channel.OutboundSynchronizer;
 import com.middlerim.client.message.Text;
 import com.middlerim.message.SequentialMessage;
@@ -51,7 +52,7 @@ public class MainFragment extends Fragment implements ButtonQueueManager.Adopter
     }
 
     private void inflateButtonQueue() {
-        ArrayDeque<OutboundSynchronizer.MessageAndContext<SequentialMessage>> leftOverMessages = OutboundSynchronizer.getMessageQueue();
+        ArrayDeque<OutboundSynchronizer.MessageAndContext<SequentialMessage>> leftOverMessages = CommandServer.getMessageQueue();
         OutboundSynchronizer.MessageAndContext<SequentialMessage> m;
         while ((m = leftOverMessages.poll()) != null) {
             if (m.message instanceof Text.Out) {

@@ -1,4 +1,4 @@
-package com.middlerim.server.command.channel;
+package com.middlerim.server.channel;
 
 import java.util.List;
 

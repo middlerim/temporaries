@@ -13,7 +13,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import com.middlerim.client.CentralEvents;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.client.view.MessagePool;
 
 public class StreamFragment extends Fragment {

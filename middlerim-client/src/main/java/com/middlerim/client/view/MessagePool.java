@@ -11,7 +11,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.middlerim.Config;
+import com.middlerim.client.Config;
 import com.middlerim.client.central.CentralEvents;
 import com.middlerim.client.session.Sessions;
 import com.middlerim.location.Coordinate;
@@ -20,13 +20,13 @@ import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.storage.persistent.FixedLayoutPersistentStorage;
 import com.middlerim.storage.persistent.Persistent;
-import com.middlerim.storage.persistent.StorageInformation;
+import com.middlerim.storage.persistent.FixedLayoutStorageInformation;
 
 public class MessagePool<T> implements Closeable {
   private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
 
   public interface Adapter<T> {
-    T onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery);
+    T onReceive(long userId, Coordinate location, String displayName, byte[] message, int numberOfDelivery);
     File storage();
   }
 
@@ -54,7 +54,9 @@ public class MessagePool<T> implements Closeable {
   private CentralEvents.Listener<CentralEvents.ReceiveMessageEvent> receiveMessageListener = new CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>() {
     @Override
     public void handle(CentralEvents.ReceiveMessageEvent event) {
-      onReceiveMessage(event.userId, event.location, event.displayName, event.message, -1);
+      byte[] message = new byte[event.message.readableBytes()];
+      event.message.readBytes(message);
+      onReceiveMessage(event.userId, event.location, event.displayName, message, -1);
     }
   };
 
@@ -82,7 +84,7 @@ public class MessagePool<T> implements Closeable {
     this.pool = new Object[capacity];
     this.myMessages = new HashMap<>();
     this.storage = new FixedLayoutPersistentStorage<Message>(
-        new StorageInformation<Message>("msgpool", Message.MAX_RECORD_SIZE, Message.MAX_RECORD_SIZE * capacity, Message.MAX_RECORD_SIZE * capacity) {
+        new FixedLayoutStorageInformation<Message>("msgpool", Config.MAX_TEXT_BYTES, Config.MAX_TEXT_BYTES * capacity, Config.MAX_TEXT_BYTES * capacity) {
           @Override
           public File storage() {
             return MessagePool.this.adapter.storage();
@@ -137,10 +139,8 @@ public class MessagePool<T> implements Closeable {
     return size;
   }
 
-  private void onReceiveMessage(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
-    message.position(0);
+  private void onReceiveMessage(long userId, Coordinate location, String displayName, byte[] message, int numberOfDelivery) {
     storage.put(new Message(last, userId, location, displayName, message, numberOfDelivery));
-    message.position(0);
     addLast(adapter.onReceive(userId, location, displayName, message, numberOfDelivery));
   }
 
@@ -187,13 +187,12 @@ public class MessagePool<T> implements Closeable {
         LOG.warn("Could not read a message cache from file storage.");
         return false;
       }
-      addLast(adapter.onReceive(message.userId, message.location, new String(message.displayName, Config.MESSAGE_ENCODING), ByteBuffer.wrap(message.message), message.numberOfDelivery));
+      addLast(adapter.onReceive(message.userId, message.location, new String(message.displayName, Config.MESSAGE_ENCODING), message.message, message.numberOfDelivery));
     }
     return true;
   }
 
   private static class Message implements Persistent<Message> {
-    static int MAX_RECORD_SIZE = 204;
     private final long index;
     private long userId;
     private Coordinate location;
@@ -203,21 +202,12 @@ public class MessagePool<T> implements Closeable {
     Message(long index) {
       this.index = index;
     }
-    Message(long index, long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
+    Message(long index, long userId, Coordinate location, String displayName, byte[] message, int numberOfDelivery) {
       this.index = index;
       this.userId = userId;
       this.location = location;
       this.displayName = displayName.getBytes(Config.MESSAGE_ENCODING);
-      int left = MAX_RECORD_SIZE - 28 - this.displayName.length;
-      if (left <= message.remaining()) {
-        byte[] bs = new byte[left];
-        message.get(bs);
-        this.message = bs;
-      } else {
-        byte[] bs = new byte[message.remaining()];
-        message.get(bs);
-        this.message = bs;
-      }
+      this.message = message;
       this.numberOfDelivery = numberOfDelivery;
     }
 

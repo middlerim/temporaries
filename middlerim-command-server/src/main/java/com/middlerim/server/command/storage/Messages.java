@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 
 import com.middlerim.message.Outbound;
 import com.middlerim.server.command.Config;
+import com.middlerim.server.storage.Sessions;
 import com.middlerim.session.Session;
 
 public final class Messages {

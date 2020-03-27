@@ -8,15 +8,17 @@ import com.middlerim.server.command.message.Location;
 import com.middlerim.server.command.storage.location.LocationStorage;
 import com.middlerim.server.command.storage.location.SphericalPoint;
 import com.middlerim.server.command.storage.location.VpTree;
+import com.middlerim.server.storage.SessionListener;
+import com.middlerim.server.storage.Sessions;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.storage.persistent.FixedLayoutPersistentStorage;
-import com.middlerim.storage.persistent.StorageInformation;
+import com.middlerim.storage.persistent.FixedLayoutStorageInformation;
 
 public final class Locations {
   private static final LocationStorage<SphericalPoint> map = new VpTree<>();
   private static final FixedLayoutPersistentStorage<Location> persistentStorage = new FixedLayoutPersistentStorage<>(
-      new StorageInformation<Location>("locations",
+      new FixedLayoutStorageInformation<Location>("locations",
           Location.SERIALIZED_BYTE_SIZE,
           Location.SERIALIZED_BYTE_SIZE * (Config.TEST ? 10_000 : SessionId.MAX_USER_SIZE), (Config.TEST ? 100_000 : 100_000_000)));
 
@@ -34,7 +36,7 @@ public final class Locations {
     if (session == null) {
       return null;
     }
-    Location location = persistentStorage.get(sessionId.userId(), Location.createEmpty(sessionId));
+    Location location = persistentStorage.get(sessionId.userId(), Location.createEmpty(session));
     updateLocation(session, location);
     return location.point;
   }
@@ -65,7 +67,7 @@ public final class Locations {
         SphericalPoint onMemory = map.findBySessionId(oldSession.sessionId);
         if (onMemory != null) {
           map.remove(oldSession.sessionId);
-          updateLocation(newSession, new Location(newSession.sessionId, onMemory.point()));
+          updateLocation(newSession, new Location(newSession, onMemory.point()));
         }
         persistentStorage.delete(oldSession.sessionId.userId());
       }

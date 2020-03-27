@@ -23,7 +23,7 @@ public final class Location implements Outbound {
     ByteBuf buf = ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE);
     byte[] sessionIdBytes = new byte[8];
     session.sessionId.readBytes(sessionIdBytes);
-    buf.writeByte(Headers.LOCATION)
+    buf.writeByte(Headers.Command.LOCATION.code)
         .writeBytes(sessionIdBytes)
         .writeInt(point.latitude)
         .writeInt(point.longitude);

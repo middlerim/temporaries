@@ -5,17 +5,21 @@ import static org.junit.Assert.*;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
 import org.junit.Before;
 import org.junit.Test;
 
+import com.middlerim.client.Config;
 import com.middlerim.client.central.CentralEvents;
 import com.middlerim.location.Coordinate;
+
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
 
 public class MessagePoolTest {
 
@@ -25,7 +29,7 @@ public class MessagePoolTest {
     long userId;
     Coordinate location;
     String displayName;
-    ByteBuffer message;
+    byte[] message;
     int numberOfDelivery;
 
     @Override
@@ -34,7 +38,7 @@ public class MessagePoolTest {
       return userId == b.userId
           && location.equals(b.location)
           && displayName.equals(b.displayName)
-          && message.equals(b.message)
+          && Arrays.equals(message, b.message)
           && numberOfDelivery == b.numberOfDelivery;
     }
 
@@ -46,7 +50,7 @@ public class MessagePoolTest {
 
   private MessagePool.Adapter<Entry> messagePoolAdapter = new MessagePool.Adapter<Entry>() {
     @Override
-    public Entry onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
+    public Entry onReceive(long userId, Coordinate location, String displayName, byte[] message, int numberOfDelivery) {
       Entry entry = new Entry();
       entry.userId = userId;
       entry.location = location;
@@ -67,10 +71,13 @@ public class MessagePoolTest {
     entry.userId = r.nextLong();
     entry.location = new Coordinate(r.nextDouble() * r.nextInt(90), r.nextDouble() * r.nextInt(180));
     entry.displayName = "NoName" + r.nextLong();
-    entry.message = ByteBuffer.allocate(2);
-    entry.message.putChar('あ');
+    ByteBuf messageBuf = Unpooled.buffer(2);
+    messageBuf.writeBytes("あ".getBytes(Config.MESSAGE_ENCODING));
+    entry.message = new byte[messageBuf.writerIndex()];
+    messageBuf.readBytes(entry.message);
     entry.numberOfDelivery = -1;
-    CentralEvents.fireReceiveMessage(entry.userId, entry.location, entry.displayName, entry.message);
+    CentralEvents.fireReceiveMessage(entry.userId, entry.location, entry.displayName, messageBuf);
+    messageBuf.release();
     return entry;
   }
 

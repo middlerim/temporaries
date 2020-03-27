@@ -1,6 +1,5 @@
 package com.middlerim.server.command.message;
 
-import java.nio.ByteBuffer;
 import java.util.List;
 
 import org.slf4j.Logger;
@@ -15,7 +14,9 @@ import com.middlerim.server.InvalidDataException;
 import com.middlerim.server.MessageCommands;
 import com.middlerim.server.command.channel.AttributeKeys;
 import com.middlerim.server.command.storage.Locations;
+import com.middlerim.server.command.storage.Messages;
 import com.middlerim.server.command.storage.location.LocationStorage;
+import com.middlerim.server.message.OutboundMessage;
 import com.middlerim.session.Session;
 
 import io.netty.buffer.ByteBuf;
@@ -40,7 +41,7 @@ public class Text {
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE)
-          .writeByte(Headers.mask(Headers.RECEIVED, Headers.TEXT))
+          .writeByte(Headers.Command.TEXT_RECEIVED.code)
           .writeInt(tag)
           .writeInt(numberOfDelivery), recipient.address));
     }
@@ -55,9 +56,9 @@ public class Text {
     public final int tag;
     public final byte displayNameLength;
     public final byte messageCommand;
-    public final ByteBuffer data;
+    public final ByteBuf data;
 
-    public In(int tag, byte displayNameLength, byte messageCommand, ByteBuffer data) {
+    public In(int tag, byte displayNameLength, byte messageCommand, ByteBuf data) {
       this.tag = tag;
       this.displayNameLength = displayNameLength;
       this.messageCommand = messageCommand;
@@ -74,19 +75,23 @@ public class Text {
 
     @Override
     public void processInput(ChannelHandlerContext ctx) {
-      Session session = ctx.channel().attr(AttributeKeys.SESSION).get();
-      Point point = Locations.findBySessionId(session.sessionId);
-      if (point == null) {
-        LOG.warn("Could not find a location for {}", session);
-        ctx.channel().write(new OutboundMessage<>(session, new TextReceived(tag, 0)));
-        return;
-      }
-      int dataLength = data.remaining();
-      List<LocationStorage.Entry> recipients = findrecipients(session);
-      ctx.channel().write(new OutboundMessage<>(session, new TextReceived(tag, recipients.size())));
-      for (LocationStorage.Entry entry : recipients) {
-        Session recipient = entry.session();
-        ctx.channel().write(new OutboundMessage<>(recipient, new Out(tag, point, displayNameLength, messageCommand, data, dataLength)));
+      try {
+        Session session = ctx.channel().attr(AttributeKeys.SESSION).get();
+        Point point = Locations.findBySessionId(session.sessionId);
+        if (point == null) {
+          LOG.warn("Could not find a location for {}", session);
+          ctx.channel().write(new OutboundMessage<>(session, new TextReceived(tag, 0)));
+          return;
+        }
+        int dataLength = data.readableBytes();
+        List<LocationStorage.Entry> recipients = findrecipients(session);
+        ctx.channel().write(new OutboundMessage<>(session, new TextReceived(tag, recipients.size())));
+        for (LocationStorage.Entry entry : recipients) {
+          Session recipient = entry.session();
+          ctx.channel().write(new OutboundMessage<>(recipient, new Out(tag, point, displayNameLength, messageCommand, data.retain().slice(), dataLength)));
+        }
+      } finally {
+        data.release();
       }
     }
   }
@@ -97,10 +102,10 @@ public class Text {
     public final Point point;
     public final int displayNameLength;
     public final byte messageCommand;
-    public final ByteBuffer data;
+    public final ByteBuf data;
     public final int dataLength;
 
-    public Out(int tag, Point point, byte displayNameLength, byte messageCommand, ByteBuffer data, int dataLength) {
+    public Out(int tag, Point point, byte displayNameLength, byte messageCommand, ByteBuf data, int dataLength) {
       this.tag = tag;
       this.point = point;
       this.displayNameLength = displayNameLength;
@@ -111,25 +116,29 @@ public class Text {
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      int byteSize = byteSize();
-      byte[] userIdBytes = new byte[4];
-      Session session = ctx.channel().attr(AttributeKeys.SESSION).get();
-      session.sessionId.readUserIdBytes(userIdBytes);
+      try {
+        Messages.removeMessage(recipient.sessionId.userId(), recipient.sessionId.serverSequenceNo());
+        short serverSequenceNo = recipient.sessionId.incrementServerSequenceNo();
+        Messages.putMessage(recipient.sessionId.userId(), serverSequenceNo, this);
 
-      ByteBuf buf = ctx.alloc().buffer(byteSize, byteSize)
-          .writeByte(Headers.TEXT)
-          .writeShort(recipient.sessionId.serverSequenceNo())
-          .writeBytes(userIdBytes)
-          .writeInt(point.latitude)
-          .writeInt(point.longitude)
-          .writeByte(displayNameLength)
-          .writeByte(messageCommand);
-      synchronized (data) {
-        // the data is shared with other threads.
-        data.position(0);
-        buf.writeBytes(data);
+        int byteSize = byteSize();
+        byte[] userIdBytes = new byte[4];
+        Session session = ctx.channel().attr(AttributeKeys.SESSION).get();
+        session.sessionId.readUserIdBytes(userIdBytes);
+
+        ByteBuf buf = ctx.alloc().buffer(byteSize, byteSize)
+            .writeByte(Headers.Command.TEXT.code)
+            .writeShort(serverSequenceNo)
+            .writeBytes(userIdBytes)
+            .writeInt(point.latitude)
+            .writeInt(point.longitude)
+            .writeByte(displayNameLength)
+            .writeByte(messageCommand)
+            .writeBytes(data);
+        return ctx.writeAndFlush(new DatagramPacket(buf, recipient.address));
+      } finally {
+        data.release();
       }
-      return ctx.writeAndFlush(new DatagramPacket(buf, recipient.address));
     }
 
     @Override

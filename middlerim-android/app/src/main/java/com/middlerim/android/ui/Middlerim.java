@@ -10,12 +10,11 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.util.Log;
 import android.util.TypedValue;
-import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
 
-import com.middlerim.client.CentralEvents;
 import com.middlerim.client.Config;
+import com.middlerim.client.central.CentralEvents;
 import com.middlerim.client.view.ViewEvents;
 
 import org.slf4j.Logger;

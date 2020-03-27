@@ -1,7 +1,5 @@
-package com.middlerim.server.command.message;
+package com.middlerim.server.message;
 
-import com.middlerim.message.SequentialMessage;
-import com.middlerim.server.command.storage.Messages;
 import com.middlerim.message.Outbound;
 import com.middlerim.session.Session;
 
@@ -15,12 +13,8 @@ public class OutboundMessage<M extends Outbound> {
     this.recipient = recipient;
     this.message = message;
   }
+
   public ChannelFuture processOutput(ChannelHandlerContext ctx) {
-    if (message instanceof SequentialMessage) {
-      Messages.removeMessage(recipient.sessionId.userId(), recipient.sessionId.serverSequenceNo());
-      short serverSequenceNo = recipient.sessionId.incrementServerSequenceNo();
-      Messages.putMessage(recipient.sessionId.userId(), serverSequenceNo, message);
-    }
     return message.processOutput(ctx, recipient);
   }
 }

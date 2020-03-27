@@ -1,4 +1,4 @@
-package com.middlerim.server.command.message;
+package com.middlerim.server.message;
 
 import com.middlerim.message.Outbound;
 import com.middlerim.server.Headers;
@@ -28,7 +28,7 @@ public final class Markers {
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.RECEIVED).writeInt(tag), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.RECEIVED.code).writeInt(tag), recipient.address));
     }
 
     @Override
@@ -49,7 +49,7 @@ public final class Markers {
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE)
-          .writeByte(Headers.AGAIN)
+          .writeByte(Headers.Control.AGAIN.code)
           .writeByte(recipient.sessionId.clientSequenceNo())
           .writeInt(tag), recipient.address));
     }
@@ -69,7 +69,7 @@ public final class Markers {
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ERROR), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.ERROR.code), recipient.address));
     }
 
     @Override
@@ -89,7 +89,7 @@ public final class Markers {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       byte[] sessionId = new byte[8];
       recipient.sessionId.readBytes(sessionId);
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ASSIGN_AID).writeBytes(sessionId), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.ASSIGN_AID.code).writeBytes(sessionId), recipient.address));
     }
 
     @Override
@@ -109,7 +109,7 @@ public final class Markers {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       byte[] userId = new byte[4];
       recipient.sessionId.readUserIdBytes(userId);
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.UPDATE_AID).writeBytes(userId), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.AGAIN.code).writeBytes(userId), recipient.address));
     }
 
     @Override

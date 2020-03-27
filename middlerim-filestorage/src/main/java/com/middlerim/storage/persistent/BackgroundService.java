@@ -13,14 +13,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class BackgroundService<L extends Persistent<L>> implements Runnable, Closeable {
+public class BackgroundService<L extends Persistent> implements Runnable, Closeable {
   private ExecutorService threadPool;
 
   private static final Logger LOG = LoggerFactory.getLogger(BackgroundService.class);
 
   private AtomicBoolean start = new AtomicBoolean(false);
 
-  private Segments<L> segments;
+  private Callback<L> storage;
   private LinkedBlockingQueue<L> putQueue;
   private LinkedBlockingQueue<Long> deleteQueue;
 
@@ -44,8 +44,8 @@ public class BackgroundService<L extends Persistent<L>> implements Runnable, Clo
     }
   }
 
-  BackgroundService(Segments<L> segments, ThreadFactory tf) {
-    this.segments = segments;
+  BackgroundService(Callback<L> storage, ThreadFactory tf) {
+    this.storage = storage;
     this.putQueue = new LinkedBlockingQueue<L>();
     this.deleteQueue = new LinkedBlockingQueue<Long>();
     this.threadPool = Executors.newFixedThreadPool(1, tf);
@@ -58,7 +58,7 @@ public class BackgroundService<L extends Persistent<L>> implements Runnable, Clo
   }
   L get(Long id, L layout) {
     try {
-      return segments.get(id, layout);
+      return storage.get(id, layout);
     } catch (Exception e) {
       LOG.error("Caught the unexpected exception.", e);
       return null;
@@ -91,12 +91,12 @@ public class BackgroundService<L extends Persistent<L>> implements Runnable, Clo
         for (;;) {
           if (putQueue.isEmpty()) {
             for (Long deleteId = deleteQueue.peek(); deleteId != null; deleteId = deleteQueue.peek()) {
-              segments.delete(deleteId);
+              storage.delete(deleteId);
               deleteQueue.poll();
             }
           }
           item = putQueue.take();
-          segments.put(item);
+          storage.put(item);
         }
       } catch (InterruptedException e) {
         if (start.get()) {
@@ -104,11 +104,11 @@ public class BackgroundService<L extends Persistent<L>> implements Runnable, Clo
         }
         L item = null;
         while ((item = putQueue.poll()) != null) {
-          segments.put(item);
+          storage.put(item);
         }
         Long deleteId;
         while ((deleteId = deleteQueue.poll()) != null) {
-          segments.delete(deleteId);
+          storage.delete(deleteId);
         }
       }
     } catch (Exception e) {
@@ -146,5 +146,11 @@ public class BackgroundService<L extends Persistent<L>> implements Runnable, Clo
 
   static void closeOnShutdown(Closeable resource) {
     RESOURCES.add(0, resource);
+  }
+  
+  public interface Callback<L extends Persistent> {
+    void put(L layout) throws Exception;
+    L get(Long id, L layout) throws Exception;
+    void delete(Long id) throws Exception;
   }
 }

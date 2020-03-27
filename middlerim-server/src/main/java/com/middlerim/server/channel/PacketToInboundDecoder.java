@@ -1,21 +1,15 @@
-package com.middlerim.server.command.channel;
+package com.middlerim.server.channel;
 
-import java.nio.BufferUnderflowException;
 import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.middlerim.location.Point;
 import com.middlerim.server.Headers;
-import com.middlerim.server.command.Config;
-import com.middlerim.server.command.message.Location;
-import com.middlerim.server.command.message.Markers;
-import com.middlerim.server.command.message.OutboundMessage;
-import com.middlerim.server.command.message.Text;
-import com.middlerim.server.command.storage.Messages;
-import com.middlerim.server.command.storage.SessionListener;
-import com.middlerim.server.command.storage.Sessions;
+import com.middlerim.server.Headers.Header;
+import com.middlerim.server.message.Markers;
+import com.middlerim.server.message.OutboundMessage;
+import com.middlerim.server.storage.Sessions;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.token.TokenIssuer;
@@ -25,7 +19,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.codec.MessageToMessageDecoder;
 
-public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPacket> {
+public abstract class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPacket> {
   private static final Logger LOG = LoggerFactory.getLogger(PacketToInboundDecoder.class);
 
   @Override
@@ -34,8 +28,8 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     if (!in.isReadable()) {
       return;
     }
-    byte header = in.readByte();
-    if (header == Headers.ASSIGN_AID) {
+    Header header = Headers.parse(in.readByte());
+    if (header == Headers.Control.ASSIGN_AID) {
       if (in.readableBytes() > 0) {
         // Invalid access.
         LOG.warn("Packet[ASSIGN_AID]: Ignored(Invalid length). {}", in);
@@ -51,7 +45,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
     in.readBytes(tokenBytes);
     SessionId sessionId = TokenIssuer.decodeTosessionId(tokenBytes);
 
-    if (header == Headers.EXIT) {
+    if (header == Headers.Control.EXIT) {
       if (in.readableBytes() > 0) {
         // Invalid access.
         LOG.warn("Packet[EXIT]: Ignored(Invalid length). {}", in);
@@ -66,7 +60,7 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       }
       return;
     }
-    if (header == Headers.ERROR) {
+    if (header == Headers.Control.ERROR) {
       Session session = Sessions.getValidatedSession(sessionId);
       if (session != null) {
         Sessions.remove(session);
@@ -75,11 +69,8 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
 
-    if (Headers.isMasked(header, Headers.RECEIVED)) {
-      Messages.removeMessage(sessionId.userId(), sessionId.serverSequenceNo());
-    }
-
-    if (!Headers.hasData(header)) {
+    if (header == Headers.Control.RECEIVED) {
+      acceptReceived(sessionId);
       return;
     }
 
@@ -96,29 +87,10 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
       return;
     }
 
-    ctx.channel().attr(AttributeKeys.SESSION).set(session);
-
     // --- Handle non-sequential message.
-
-    if (Headers.isMasked(header, Headers.LOCATION)) {
-      if (!session.sessionId.validateClient(sessionId)) {
-        LOG.warn("Packet[LOCATION] - {}: Ignored(Invalid session ID on client={}).", session, sessionId);
-        return;
-      }
-      int latitude = in.readInt();
-      int longtitude = in.readInt();
-      if (in.readableBytes() > 0) {
-        // Invalid access.
-        LOG.warn("Packet[LOCATION] - {}: Ignored(Invalid length). {}", session, in);
-        return;
-      }
-      Point point = new Point(latitude, longtitude);
-      LOG.debug("Packet[LOCATION] - {}: {}", session, point);
-      out.add(new Location(session.sessionId, point));
+    if (handleNonSequentialRequest(ctx, header, session, sessionId, in, out)) {
       return;
     }
-
-    // --- Handle Sequential message.
 
     int tag = in.readInt();
     if (!session.sessionId.validateClientAndRefresh(sessionId)) {
@@ -136,45 +108,14 @@ public class PacketToInboundDecoder extends MessageToMessageDecoder<DatagramPack
         return;
       }
     }
-
-    if (Headers.isMasked(header, Headers.TEXT)) {
-      byte messageCommand = in.readByte();
-      byte displayNameLength = in.readByte();
-      LOG.debug("Packet[TEXT] - {}: tag={}, buff={}", session, tag, in);
-      out.add(new Text.In(tag, displayNameLength, messageCommand, in.nioBuffer()));
-    }
-
-    // Send RECEIVED response when receiving message which implements SequencialMessage except TEXT.
-    // When receiving TEXT message, TextReceived response is going to be sent instead.
-    if (!Headers.isMasked(header, Headers.TEXT)) {
-      ctx.channel().writeAndFlush(new OutboundMessage<>(session, new Markers.Received(tag)));
+    if (!handleSequentialRequest(ctx, header, tag, session, sessionId, in, out)) {
+      LOG.warn("Unkown request received from {}. in: {}", session, in);
+      Sessions.remove(session);
     }
   }
 
-  @Override
-  public boolean isSharable() {
-    return true;
-  }
+  protected abstract void acceptReceived(SessionId clientSessionId);
 
-  @Override
-  public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-    ctx.channel().writeAndFlush(new OutboundMessage<>(ctx.channel().attr(AttributeKeys.SESSION).get(), Markers.INVALID_DATA));
-    // Ignore BufferUnderFlowException since length of the packet isn't validated deliberately in advance.
-    if (Config.TEST | !(cause instanceof BufferUnderflowException || (cause.getCause() != null && cause.getCause() instanceof BufferUnderflowException))) {
-      LOG.error("Unexpected exception", cause);
-    }
-  }
-
-  static {
-    Sessions.addListener(new SessionListener() {
-      @Override
-      public void onRemove(Session session) {
-      }
-
-      @Override
-      public void onExpire(Session oldSession, Session newSession) {
-        onRemove(oldSession);
-      }
-    });
-  }
+  protected abstract boolean handleNonSequentialRequest(ChannelHandlerContext ctx, Header header, Session session, SessionId clientSessionId, ByteBuf in, List<Object> out);
+  protected abstract boolean handleSequentialRequest(ChannelHandlerContext ctx, Header header, int tag, Session session, SessionId clientSessionId, ByteBuf in, List<Object> out);
 }

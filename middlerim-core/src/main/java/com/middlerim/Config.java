@@ -1,6 +1,5 @@
 package com.middlerim;
 
-import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
 
 import org.slf4j.Logger;
@@ -15,20 +14,17 @@ public abstract class Config {
 
   // < 1280 to prevent IP fragmentation
   public static final int MAX_COMMAND_BYTE = 1280;
-  public static final int MAX_MEDIA_MESSAGE_BYTE = 2_560_000;
+  public static final int MAX_SMALLMEDIA_BYTE = 2_560_000;
   public static final int MAX_DISPLAY_NAME_BYTE_LENGTH = 46;
+  public static final int MAX_TEXT_BYTES = 800;
   public static final Charset MESSAGE_ENCODING = Charset.forName("utf-8");
 
-  public static final String CENTRAL_SERVER_IPV4_HOST = "192.168.101.7";
-  public static final int CENTRAL_SERVER_IPV4_PORT = 1231;
-  public static final String CENTRAL_SERVER_IPV6_HOST = "fe80::3e15:c2ff:fee6:8cc0";
-  public static final int CENTRAL_SERVER_IPV6_PORT = 1232;
+  public static final int COMMAND_SERVER_PORT = 1235;
+  public static final int SMALL_MEDIA_SERVER_PORT = 1236;
 
   public static final int SESSIONID_RENEW_CYCLE_MILLIS = getIntValue("middlerim.sessionid.renew.cycle.millis", 60 * 60 * 1000);
   public static final String KEY_SESSION_TIMEOUT_MILLIS = "middlerim.session.timeout.millis";
   public static final int SESSION_TIMEOUT_MILLIS = getIntValue(KEY_SESSION_TIMEOUT_MILLIS, 30 * 60 * 1000);
-
-  public static final InetSocketAddress COMMAND_SERVER_IPV4 = new InetSocketAddress(Config.CENTRAL_SERVER_IPV4_HOST, Config.CENTRAL_SERVER_IPV4_PORT);
 
   static {
     LOG.info("SESSIONID_RENEW_CYCLE_MILLIS={}", SESSIONID_RENEW_CYCLE_MILLIS);

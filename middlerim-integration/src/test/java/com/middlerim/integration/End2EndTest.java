@@ -2,6 +2,7 @@ package com.middlerim.integration;
 
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
@@ -30,8 +31,6 @@ import com.middlerim.token.TokenIssuer;
 import com.middlerim.util.Bytes;
 
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 
 @FixMethodOrder(MethodSorters.JVM)
 public abstract class End2EndTest {
@@ -52,18 +51,15 @@ public abstract class End2EndTest {
         latch.countDown();
       }
     }, "CentralServer").run();
-    new Thread(new Runnable() {
 
+    CentralEvents.onStarted("End2EndTest.CentralEvents.Listener<CentralEvents.StartedEvent>", new CentralEvents.Listener<CentralEvents.StartedEvent>() {
       @Override
-      public void run() {
-        CentralServer.run(ctx).addListener(new ChannelFutureListener() {
-          @Override
-          public void operationComplete(ChannelFuture future) throws Exception {
-            latch.countDown();
-          }
-        });
+      public void handle(CentralEvents.StartedEvent event) {
+        latch.countDown();
       }
-    }, "Client").run();
+    });
+    CentralServer.run(ctx);
+
     latch.await();
 
     CentralEvents.onReceiveMessage("End2EndTest.CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>", new CentralEvents.Listener<CentralEvents.ReceiveMessageEvent>() {
@@ -111,7 +107,7 @@ public abstract class End2EndTest {
     DatagramSocket clientSocket = null;
     try {
       clientSocket = new DatagramSocket();
-      DatagramPacket assingAidPacket = new DatagramPacket(new byte[]{Headers.ASSIGN_AID}, 1, Config.COMMAND_SERVER_IPV4);
+      DatagramPacket assingAidPacket = new DatagramPacket(new byte[]{Headers.Control.ASSIGN_AID.code}, 1, Config.COMMAND_SERVER);
       clientSocket.send(assingAidPacket);
       byte[] receivedData = new byte[9];
       DatagramPacket receivePacket = new DatagramPacket(receivedData, receivedData.length);
@@ -129,17 +125,20 @@ public abstract class End2EndTest {
   }
 
   protected void setLocation(SessionId sessionId, Coordinate location) {
+    setLocation(sessionId, location, Config.COMMAND_SERVER);
+  }
+  protected void setLocation(SessionId sessionId, Coordinate location, InetSocketAddress address) {
     DatagramSocket clientSocket = null;
     try {
       clientSocket = new DatagramSocket();
       byte[] sessionIdBytes = new byte[8];
       sessionId.readBytes(sessionIdBytes);
       Point point = location.toPoint();
-      byte[] data = Unpooled.buffer(Location.FIXED_BYTE_SIZE).writeByte(Headers.LOCATION)
+      byte[] data = Unpooled.buffer(Location.FIXED_BYTE_SIZE).writeByte(Headers.Command.LOCATION.code)
           .writeBytes(sessionIdBytes)
           .writeInt(point.latitude)
           .writeInt(point.longitude).array();
-      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, Config.COMMAND_SERVER_IPV4);
+      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, address);
       clientSocket.send(assingAidPacket);
       Thread.sleep(50);
       LOG.debug("Set location {} for the dummy user {}", location, sessionId);
@@ -154,6 +153,9 @@ public abstract class End2EndTest {
 
   private int tag = Integer.MAX_VALUE;
   protected int sendMessage(SessionId sessionId, byte messageCommand) {
+    return sendMessage(sessionId, messageCommand, Config.COMMAND_SERVER);
+  }
+  protected int sendMessage(SessionId sessionId, byte messageCommand, InetSocketAddress address) {
     DatagramSocket clientSocket = null;
     try {
       clientSocket = new DatagramSocket();
@@ -162,14 +164,14 @@ public abstract class End2EndTest {
       sessionId.readBytes(sessionIdBytes);
 
       byte[] data = Unpooled.buffer(15)
-          .writeByte(Headers.TEXT)
+          .writeByte(Headers.Command.TEXT.code)
           .writeBytes(sessionIdBytes)
           .writeInt(tag++)
           .writeByte(messageCommand)
           .writeByte((byte) 2)
           .writeChar('あ')
           .writeChar('い').array();
-      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, Config.COMMAND_SERVER_IPV4);
+      DatagramPacket assingAidPacket = new DatagramPacket(data, data.length, address);
       clientSocket.send(assingAidPacket);
       byte[] receivedData = new byte[9];
       DatagramPacket receivePacket = new DatagramPacket(receivedData, receivedData.length);
@@ -199,7 +201,10 @@ public abstract class End2EndTest {
   }
   protected void sendMessage(byte messageCommand, boolean wait) throws InterruptedException {
     String displayName = "あいう";
-    ByteBuffer message = ByteBuffer.allocate(3).putChar('✌');
+    ByteBuffer messageBuf = ByteBuffer.allocate(3).putChar('✌');
+    byte[] message = new byte[messageBuf.position()];
+    messageBuf.position(0);
+    messageBuf.get(message);
     ViewEvents.fireSubmitMessage(0, displayName, messageCommand, message);
     ctx.lastReceivedTextEvent = null;
     if (wait) {

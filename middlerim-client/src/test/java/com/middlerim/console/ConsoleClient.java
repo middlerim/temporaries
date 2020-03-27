@@ -3,7 +3,6 @@ package com.middlerim.console;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
-import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.file.Paths;
 import java.util.concurrent.CountDownLatch;
@@ -31,14 +30,12 @@ public class ConsoleClient {
   }
 
   private static MessagePool.Adapter<Message> messagePoolAdaptor = new MessagePool.Adapter<Message>() {
-    public Message onReceive(long userId, Coordinate location, String displayName, ByteBuffer message, int numberOfDelivery) {
+    public Message onReceive(long userId, Coordinate location, String displayName, byte[] message, int numberOfDelivery) {
       Message msg = new Message();
       msg.userId = userId;
       msg.location = location;
       msg.displayName = displayName;
-      byte[] bs = new byte[message.remaining()];
-      message.get(bs);
-      msg.content = new String(bs, Config.MESSAGE_ENCODING);
+      msg.content = new String(message, Config.MESSAGE_ENCODING);
       msg.numberOfDelivery = numberOfDelivery;
 
       System.out.println("New message -------");
@@ -117,12 +114,11 @@ public class ConsoleClient {
           // Ignore
         }
         if (c.getCount() > 0) {
-          final ByteBuffer buf = ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()});
-          ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(80), buf);
+          ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(80), new byte[]{'a', 'b', 'c', (byte) c.getCount()});
         }
       }
     });
-    ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), ByteBuffer.wrap(new byte[]{'a', 'b', 'c', (byte) c.getCount()}));
+    ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), new byte[]{'a', 'b', 'c', (byte) c.getCount()});
     boolean result = c.await(10, TimeUnit.SECONDS);
     System.out.println((System.currentTimeMillis() - start) + "ms" + "[" + result + "]");
   }
@@ -150,10 +146,8 @@ public class ConsoleClient {
         System.out.println("Enter Message >");
         String message = br.readLine();
         byte[] messageBytes = message.getBytes(Charset.forName("utf-8"));
-        ByteBuffer buf = ByteBuffer.allocate(messageBytes.length);
-        buf.put(messageBytes).rewind();
-        System.out.println("Sending text size: " + messageBytes.length + ", remaining: " + buf.remaining());
-        ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), buf);
+        System.out.println("Sending text size: " + messageBytes.length + ", remaining: " + messageBytes.length);
+        ViewEvents.fireSubmitMessage(0, displayName, MessageCommands.areaKM(10), messageBytes);
       } else if ("C".equals(s)) {
         System.out.println("Enter messages count >");
         String size = br.readLine();

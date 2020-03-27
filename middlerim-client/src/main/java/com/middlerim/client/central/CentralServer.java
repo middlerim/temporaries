@@ -21,7 +21,7 @@ public class CentralServer {
   private static List<ChannelFuture> closeFutures = new ArrayList<>(2);
   private static EventLoopGroup eventGroup;
 
-  public static ChannelFuture run(ViewContext viewContext) {
+  public static void run(ViewContext viewContext) {
     if (isStarted()) {
       shutdown();
     }
@@ -31,17 +31,17 @@ public class CentralServer {
     b.group(eventGroup)
         .channel(NioDatagramChannel.class)
         .option(ChannelOption.SO_REUSEADDR, true)
-        .option(ChannelOption.SO_SNDBUF, Config.MAX_COMMAND_BYTE * 100 + Config.MAX_MEDIA_MESSAGE_BYTE * 2)
-        .option(ChannelOption.SO_RCVBUF, Config.MAX_COMMAND_BYTE * 100 + Config.MAX_MEDIA_MESSAGE_BYTE * 2);
+        .option(ChannelOption.SO_SNDBUF, Config.MAX_COMMAND_BYTE * 100 + Config.MAX_SMALLMEDIA_BYTE * 2)
+        .option(ChannelOption.SO_RCVBUF, Config.MAX_COMMAND_BYTE * 100 + Config.MAX_SMALLMEDIA_BYTE * 2);
 
-    ChannelFuture bootFuture = CommandServer.listen(b);
+    closeFutures.add(CommandServer.listen(b));
+    // closeFutures.add(SmallMediaServer.listen(b));
+
     if (Sessions.getSession() == null) {
       Sessions.setAnonymous();
       CommandServer.channel().writeAndFlush(Markers.ASSIGN_AID);
     }
     CentralEvents.fireStarted();
-    closeFutures.add(bootFuture.channel().closeFuture());
-    return bootFuture;
   }
 
   public static boolean isStarted() {

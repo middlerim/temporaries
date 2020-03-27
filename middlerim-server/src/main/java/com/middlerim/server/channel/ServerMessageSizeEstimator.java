@@ -1,6 +1,6 @@
-package com.middlerim.server.command.channel;
+package com.middlerim.server.channel;
 
-import com.middlerim.server.command.message.OutboundMessage;
+import com.middlerim.server.message.OutboundMessage;
 
 import io.netty.channel.MessageSizeEstimator;
 import io.netty.channel.socket.DatagramPacket;

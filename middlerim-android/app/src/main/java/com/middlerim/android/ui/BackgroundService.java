@@ -6,8 +6,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.support.v4.app.NotificationCompat;
 
-import com.middlerim.client.CentralEvents;
-import com.middlerim.client.CentralServer;
+import com.middlerim.client.central.CentralEvents;
+import com.middlerim.client.central.CentralServer;
 import com.middlerim.client.view.ViewEvents;
 
 public class BackgroundService extends IntentService {

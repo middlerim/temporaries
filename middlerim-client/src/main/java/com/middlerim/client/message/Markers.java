@@ -52,7 +52,7 @@ public final class Markers {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       byte[] sessionId = new byte[8];
       recipient.sessionId.copyWithNewServerSequenceNo(serverSequenceNo).readBytes(sessionId);
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.RECEIVED).writeBytes(sessionId), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.RECEIVED.code).writeBytes(sessionId), recipient.address));
     }
 
     @Override
@@ -71,7 +71,7 @@ public final class Markers {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
       byte[] sessionId = new byte[8];
       recipient.sessionId.readBytes(sessionId);
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ERROR).writeBytes(sessionId), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.ERROR.code).writeBytes(sessionId), recipient.address));
     }
 
     @Override
@@ -90,7 +90,7 @@ public final class Markers {
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session session) {
       byte[] sessionId = new byte[8];
       session.sessionId.readBytes(sessionId);
-      return ctx.write(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.EXIT).writeBytes(sessionId), session.address));
+      return ctx.write(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.EXIT.code).writeBytes(sessionId), session.address));
     }
 
     @Override
@@ -107,7 +107,7 @@ public final class Markers {
 
     @Override
     public ChannelFuture processOutput(ChannelHandlerContext ctx, Session recipient) {
-      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.ASSIGN_AID), recipient.address));
+      return ctx.writeAndFlush(new DatagramPacket(ctx.alloc().buffer(FIXED_BYTE_SIZE, FIXED_BYTE_SIZE).writeByte(Headers.Control.ASSIGN_AID.code), recipient.address));
     }
 
     @Override

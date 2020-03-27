@@ -1,51 +1,116 @@
 package com.middlerim.server;
 
-public final class Headers {
+import java.util.HashMap;
+import java.util.Map;
 
-  private Headers() {
+public final class Headers {
+  private static final byte MASK_COMMAND = 0b1000;
+  private static final byte MASK_SMALL_MEDIA = 0b1000;
+
+  private static final Map<Byte, Header> headers = new HashMap<>();
+
+  public interface Header {
+
   }
 
-  // --- Control command.
-
   /**
-   * Exit the process.
+   * Control headers.
    */
-  public static final byte EXIT = 0b0000001;
+  public enum Control implements Header {
+      /**
+       * Received the message.
+       */
+      RECEIVED(0b0000001),
 
-  /**
-   * Received the message.
-   */
-  public static final byte RECEIVED = 0b0000010;
+      /**
+       * Exit the process.
+       */
+      EXIT(0b0000010),
 
-  /**
-   * Re-send the previous message again from a client.
-   */
-  public static final byte AGAIN = 0b0000011;
+      /**
+       * Re-send the previous message again from a client.
+       */
+      AGAIN(0b0000011),
 
-  /**
-   * Assign Anonymous-ID.
-   */
-  public static final byte ASSIGN_AID = 0b0000100;
+      /**
+       * Assign Anonymous-ID.
+       */
+      ASSIGN_AID(0b0000100),
 
-  /**
-   * Update Anonymous-ID.
-   */
-  public static final byte UPDATE_AID = 0b0000101;
+      /**
+       * Update Anonymous-ID.
+       */
+      UPDATE_AID(0b0000101),
 
-  /**
-   * Unexpected error occurred.
-   */
-  public static final byte ERROR = 0b0000111;
+      /**
+       * Unexpected error occurred.
+       */
+      ERROR(0b0000111);
 
-  /**
-   * Location mask.
-   */
-  public static final byte LOCATION = 0b0001000;
+    public final byte code;
+    private Control(int b) {
+      if (b > 7) {
+        throw new IllegalArgumentException();
+      }
+      this.code = (byte) b;
+      if (headers.put(this.code, this) != null) {
+        throw new IllegalArgumentException();
+      }
+    }
+  }
 
-  /**
-   * Text mask.
-   */
-  public static final byte TEXT = 0b0010000;
+  public enum Command implements Header {
+
+      /**
+       * Location.
+       */
+      LOCATION(mask(MASK_COMMAND, (byte) 0b10)),
+
+      /**
+       * Text.
+       */
+      TEXT(mask(MASK_COMMAND, (byte) 0b100)),
+
+      /**
+       * Text Received.
+       */
+      TEXT_RECEIVED(mask(MASK_COMMAND, Control.RECEIVED.code, (byte) 0b100));
+
+    public final byte code;
+    private Command(byte b) {
+      this.code = b;
+      if (!isMasked(code, MASK_COMMAND)) {
+        throw new IllegalArgumentException();
+      }
+      if (headers.put(code, this) != null) {
+        throw new IllegalArgumentException();
+      }
+    }
+  }
+
+  public enum SmallMedia implements Header {
+
+      /**
+       * Image.
+       */
+      IMAGE(mask(MASK_SMALL_MEDIA, (byte) 0b10)),
+
+      /**
+       * Image Received.
+       */
+      IMAGE_RECEIVED(mask(MASK_SMALL_MEDIA, Control.RECEIVED.code, (byte) 0b10));
+
+    public final byte code;
+    private SmallMedia(byte b) {
+      this.code = b;
+      if (!isMasked(code, MASK_SMALL_MEDIA)) {
+        throw new IllegalArgumentException();
+      }
+      if (headers.put(code, this) != null) {
+        throw new IllegalArgumentException();
+      }
+    }
+  }
 
   public static byte mask(byte... headers) {
     byte b = headers[0];
@@ -59,7 +124,11 @@ public final class Headers {
     return (header & mask) == mask;
   }
 
-  public static boolean hasData(byte header) {
+  public boolean hasData(byte header) {
     return (header & 0b11111000) != 0;
+  }
+
+  public static Header parse(byte b) {
+    return headers.get(b);
   }
 }

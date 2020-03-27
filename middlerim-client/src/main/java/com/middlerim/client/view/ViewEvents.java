@@ -1,6 +1,5 @@
 package com.middlerim.client.view;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -102,9 +101,9 @@ public final class ViewEvents {
     public final int tag;
     public final String displayName;
     public final byte messageCommand;
-    public final ByteBuffer message;
+    public final byte[] message;
 
-    private SubmitMessageEvent(int tag, String displayName, byte messageCommand, ByteBuffer message) {
+    private SubmitMessageEvent(int tag, String displayName, byte messageCommand, byte[] message) {
       this.tag = tag;
       this.displayName = displayName;
       this.messageCommand = messageCommand;
@@ -149,7 +148,7 @@ public final class ViewEvents {
     handleEvent(new LocationUpdateEvent(location), locationUpdateListeners);
   }
 
-  public static void fireSubmitMessage(int tag, String displayName, byte messageCommand, ByteBuffer message) {
+  public static void fireSubmitMessage(int tag, String displayName, byte messageCommand, byte[] message) {
     handleEvent(new SubmitMessageEvent(tag, displayName, messageCommand, message), submitMessageListeners);
   }
 

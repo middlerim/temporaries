@@ -92,10 +92,10 @@ public class Senario1 extends End2EndTest {
       sendMessageAsync(MessageCommands.areaM(32));
     }
     Thread.sleep(10);
-    Session serverSessionUserA = com.middlerim.server.command.storage.Sessions.getSession(Sessions.getSession().sessionId.userId());
+    Session serverSessionUserA = com.middlerim.server.storage.Sessions.getSession(Sessions.getSession().sessionId.userId());
     assertThat(Sessions.getSession().sessionId.clientSequenceNo(), is(serverSessionUserA.sessionId.clientSequenceNo()));
 
-    Session serverSessionUserB = com.middlerim.server.command.storage.Sessions.getSession(userB.userId());
+    Session serverSessionUserB = com.middlerim.server.storage.Sessions.getSession(userB.userId());
     assertThat(userB.clientSequenceNo(), is(serverSessionUserB.sessionId.clientSequenceNo()));
 
     setLocation(userB, MARUNOUCHI_2_4_2_TOKYO);
@@ -104,10 +104,10 @@ public class Senario1 extends End2EndTest {
       sendMessageAsync(MessageCommands.areaM(32));
     }
     Thread.sleep(10);
-    serverSessionUserA = com.middlerim.server.command.storage.Sessions.getSession(Sessions.getSession().sessionId.userId());
+    serverSessionUserA = com.middlerim.server.storage.Sessions.getSession(Sessions.getSession().sessionId.userId());
     assertThat(Sessions.getSession().sessionId.clientSequenceNo(), is(serverSessionUserA.sessionId.clientSequenceNo()));
 
-    serverSessionUserB = com.middlerim.server.command.storage.Sessions.getSession(userB.userId());
+    serverSessionUserB = com.middlerim.server.storage.Sessions.getSession(userB.userId());
     assertThat(userB.clientSequenceNo(), is(serverSessionUserB.sessionId.clientSequenceNo()));
   }
 

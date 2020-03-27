@@ -26,7 +26,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
   private static final Logger LOG = LoggerFactory.getLogger(Config.INTERNAL_APP_NAME);
 
   // Queue for sequential messages.
-  static final ArrayDeque<MessageAndContext<SequentialMessage>> MESSAGE_QUEUE = new ArrayDeque<>(Config.MAX_MESSAGE_QUEUE);
+  private final ArrayDeque<MessageAndContext<SequentialMessage>> messageQueue = new ArrayDeque<>(Config.MAX_MESSAGE_QUEUE);
   private final long startTimeMillis = System.currentTimeMillis();
 
   private Timer retryTimer;
@@ -43,8 +43,8 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       @Override
       public void handle(CentralEvents.ReceivedEvent event) {
         working = true;
-        synchronized (MESSAGE_QUEUE) {
-          MESSAGE_QUEUE.poll(); // Remove first.
+        synchronized (messageQueue) {
+          messageQueue.poll(); // Remove first.
         }
         sendLastPossiblyDiscardedMessage();
         totalMsgSent++;
@@ -58,7 +58,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
           retryTimer.cancel();
         }
         retryTimer = new Timer(Config.INTERNAL_APP_NAME + "-sync", true);
-        retryTimer.schedule(new RetryTimerTask(MESSAGE_QUEUE.peek(), 0), Config.MIN_RETRY_RERIOD_MILLIS);
+        retryTimer.schedule(new RetryTimerTask(messageQueue.peek(), 0), Config.MIN_RETRY_RERIOD_MILLIS);
       }
     });
     ViewEvents.onPause("OutboundSynchronizer.ViewEvents.Listener<ViewEvents.PauseEvent>", new ViewEvents.Listener<ViewEvents.PauseEvent>() {
@@ -80,7 +80,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
   }
 
   private ChannelFuture sendFromQueue() {
-    MessageAndContext<SequentialMessage> next = MESSAGE_QUEUE.peek();
+    MessageAndContext<SequentialMessage> next = messageQueue.peek();
     if (next == null) {
       return null;
     }
@@ -110,7 +110,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       }
       MessageAndContext<SequentialMessage> mc = prev;
       if (mc == null) {
-        mc = MESSAGE_QUEUE.peek();
+        mc = messageQueue.peek();
       }
       if (mc == null) {
         return false;
@@ -128,7 +128,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
         retryTimer.schedule(new RetryTimerTask(prev, retryCount + 1), Config.MIN_RETRY_RERIOD_MILLIS);
         return;
       }
-      MessageAndContext<SequentialMessage> next = MESSAGE_QUEUE.peek();
+      MessageAndContext<SequentialMessage> next = messageQueue.peek();
       if (prev == null || prev != next) {
         long wait = averageMessageSentMillis();
         if (wait < Config.MIN_RETRY_RERIOD_MILLIS) {
@@ -157,7 +157,7 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     Outbound message = (Outbound) msg;
 
     if (message instanceof Markers.Again) {
-      MessageAndContext<SequentialMessage> next = MESSAGE_QUEUE.peek();
+      MessageAndContext<SequentialMessage> next = messageQueue.peek();
       int requestedTag = ((Markers.Again)message).tag;
       if (next.message.tag() != requestedTag) {
         LOG.warn("Invalid request from central server. requested tag={}, current tag={}", requestedTag, next.message.tag());
@@ -181,14 +181,14 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
       return;
     }
     if (message instanceof SequentialMessage) {
-      if (MESSAGE_QUEUE.size() >= Config.MAX_MESSAGE_QUEUE) {
+      if (messageQueue.size() >= Config.MAX_MESSAGE_QUEUE) {
         // Message queue is full.
         CentralEvents.fireLostMessage((SequentialMessage) message, CentralEvents.LostMessageEvent.Type.LIMIT);
         return;
       }
       boolean added;
-      synchronized (MESSAGE_QUEUE) {
-        added = MESSAGE_QUEUE.offer(new MessageAndContext<>((SequentialMessage) message, ctx));
+      synchronized (messageQueue) {
+        added = messageQueue.offer(new MessageAndContext<>((SequentialMessage) message, ctx));
       }
       if (!added) {
         CentralEvents.fireLostMessage((SequentialMessage) message, CentralEvents.LostMessageEvent.Type.LIMIT);
@@ -218,8 +218,8 @@ public class OutboundSynchronizer extends ChannelOutboundHandlerAdapter {
     return true;
   }
 
-  public static ArrayDeque<MessageAndContext<SequentialMessage>> getMessageQueue() {
-    return MESSAGE_QUEUE.clone();
+  public ArrayDeque<MessageAndContext<SequentialMessage>> getMessageQueue() {
+    return messageQueue.clone();
   }
 
   public static final class MessageAndContext<M> {

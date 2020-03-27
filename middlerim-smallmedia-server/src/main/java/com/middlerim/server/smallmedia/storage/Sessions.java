@@ -1,4 +1,4 @@
-package com.middlerim.server.command.storage;
+package com.middlerim.server.smallmedia.storage;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -13,27 +13,12 @@ import java.util.TimerTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.middlerim.server.command.Config;
+import com.middlerim.server.smallmedia.Config;
 import com.middlerim.session.Session;
 import com.middlerim.session.SessionId;
 import com.middlerim.storage.persistent.IdStorage;
 import com.middlerim.storage.persistent.IdStorageInformation;
 
-/**
- * 
- * 3人までアクティブなユーザーを持てるとする。
- * 4人目が来たら1人目のセッションを削除する。
- * その後1人目が再度来たら2人目のセッションを削除する。
- * 1人目のセッションIDは再度採番(5)される。
- * セッションIDは1から5までの間で再利用しながら採番する。
- * 一定期間(30min程度)アクセスの無いセッションは削除する。
- * (!) この期間はセッションIDが1周する期間より短く設定する必要がある。
- * セッションが削除されるとメッセージのpublishができなくなるため、これを防ぐ(一定期間アクセスの無い状態を防ぐ)ためにユーザーの端末から定期的にリクエストを送信する。
- * 端末の状態により以下のケースではアクセスが来ないが、これらのケースでは仮にpublishされたとしても端末にメッセージが届くことがないため問題ない。
- * - インターネットに繋がっていない
- * - アプリが強制的に終了された
- * とは言ってもこの期間にpublishされるはずだったメッセージは端末が復活したタイミングで送信したいので、指定時間内のメッセージを能動的に取得できる仕組みは必要。
- */
 public final class Sessions {
   private static final Logger LOG = LoggerFactory.getLogger(Sessions.class);
   private static Timer timer = new Timer("session-cleaner", true);

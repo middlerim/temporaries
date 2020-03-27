@@ -4,10 +4,8 @@ import java.nio.ByteBuffer;
 
 import com.middlerim.location.Point;
 import com.middlerim.message.Inbound;
-import com.middlerim.server.command.channel.AttributeKeys;
 import com.middlerim.server.command.storage.Locations;
 import com.middlerim.session.Session;
-import com.middlerim.session.SessionId;
 import com.middlerim.storage.persistent.Persistent;
 
 import io.netty.channel.ChannelHandlerContext;
@@ -15,38 +13,36 @@ import io.netty.channel.ChannelHandlerContext;
 public class Location implements Inbound, Persistent<Location> {
   public static final int SERIALIZED_BYTE_SIZE = Byte.BYTES + Integer.BYTES * 2;
 
-  private SessionId sessionId;
+  private Session session;
   public Point point;
 
-  public static Location createEmpty(SessionId sessionId) {
+  public static Location createEmpty(Session session) {
     Location location = new Location();
-    location.sessionId = sessionId;
+    location.session = session;
     return location;
   }
 
   private Location() {
   }
 
-  public Location(SessionId sessionId, Point point) {
-    this.sessionId = sessionId;
+  public Location(Session session, Point point) {
+    this.session = session;
     this.point = point;
   }
 
   @Override
   public void processInput(ChannelHandlerContext ctx) {
-    Session session = ctx.channel().attr(AttributeKeys.SESSION).get();
-    sessionId = session.sessionId;
     Locations.updateLocation(session, this);
   }
 
   @Override
   public long id() {
-    return sessionId.userId();
+    return session.sessionId.userId();
   }
 
   @Override
   public void read(ByteBuffer buf) {
-    buf.put(sessionId.clientSequenceNo())
+    buf.put(session.sessionId.clientSequenceNo())
         .putInt(point.latitude)
         .putInt(point.longitude);
   }

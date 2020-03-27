@@ -8,7 +8,7 @@ public class Sessions {
   private volatile static Session singleton;
 
   public static Session setAnonymous() {
-    singleton = Session.create(SessionId.ANONYMOUS, Config.COMMAND_SERVER_IPV4);
+    singleton = Session.create(SessionId.ANONYMOUS, Config.COMMAND_SERVER);
     return singleton;
   }
 

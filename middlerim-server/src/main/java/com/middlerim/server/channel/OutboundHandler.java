@@ -1,10 +1,10 @@
-package com.middlerim.server.command.channel;
+package com.middlerim.server.channel;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.middlerim.message.Outbound;
-import com.middlerim.server.command.message.OutboundMessage;
+import com.middlerim.server.message.OutboundMessage;
 
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;

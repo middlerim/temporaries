@@ -1,6 +1,5 @@
 package com.middlerim.client.central;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -9,6 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.middlerim.location.Coordinate;
 import com.middlerim.message.SequentialMessage;
+
+import io.netty.buffer.ByteBuf;
 
 public final class CentralEvents {
 
@@ -102,9 +103,9 @@ public final class CentralEvents {
     public final long userId;
     public final Coordinate location;
     public final String displayName;
-    public final ByteBuffer message;
+    public final ByteBuf message;
 
-    private ReceiveMessageEvent(long userId, Coordinate location, String displayName, ByteBuffer message) {
+    private ReceiveMessageEvent(long userId, Coordinate location, String displayName, ByteBuf message) {
       this.userId = userId;
       this.location = location;
       this.displayName = displayName;
@@ -146,8 +147,8 @@ public final class CentralEvents {
   public static class SendMessageEvent implements Event {
     public final int tag;
     public final String displayName;
-    public final ByteBuffer message;
-    private SendMessageEvent(int tag, String displayName, ByteBuffer message) {
+    public final byte[] message;
+    private SendMessageEvent(int tag, String displayName, byte[] message) {
       this.tag = tag;
       this.displayName = displayName;
       this.message = message;
@@ -172,8 +173,14 @@ public final class CentralEvents {
     handleEvent(new ErrorEvent(errorCode, cause), errorListeners);
   }
 
-  public static void fireReceiveMessage(long userId, Coordinate location, String displayName, ByteBuffer message) {
-    handleEvent(new ReceiveMessageEvent(userId, location, displayName, message), receiveMessageListeners);
+  public static void fireReceiveMessage(long userId, Coordinate location, String displayName, ByteBuf message) {
+    for (Listener<ReceiveMessageEvent> l : receiveMessageListeners) {
+      try {
+        l.handle(new ReceiveMessageEvent(userId, location, displayName, message.retain().duplicate().readerIndex(0)));
+      } finally {
+        message.release();
+      }
+    }
   }
 
   public static void fireReceived(int tag) {
@@ -188,7 +195,7 @@ public final class CentralEvents {
     handleEvent(new LostMessageEvent(message, type), lostMessageListeners);
   }
 
-  public static void fireSendMessage(int tag, String displayName, ByteBuffer messageBytes) {
+  public static void fireSendMessage(int tag, String displayName, byte[] messageBytes) {
     handleEvent(new SendMessageEvent(tag, displayName, messageBytes), sendMessageListeners);
   }
 }
